@@ -72,7 +72,7 @@ async function forceLogout(){
 async function afterLogin(){
   await loadProfile();
 
-  if(state.profile?.admin === 'scanner'){
+  if(state.profile?.role === 'scanner'){
     await sb.auth.signOut();
     el('loginError').textContent = 'Akun ini cuma bisa dipake login di app abwarehouse, bukan di web.';
     el('loginError').classList.add('show');
