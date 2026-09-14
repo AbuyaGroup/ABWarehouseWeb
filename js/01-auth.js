@@ -74,7 +74,7 @@ async function afterLogin(){
 
   if(state.profile?.role === 'scanner'){
     await sb.auth.signOut();
-    el('loginError').textContent = 'Akun ini cuma bisa dipake login di app abwarehouse, bukan di web.';
+    el('loginError').textContent = 'Maaf, akun ini hanya bisa digunakan untuk login di aplikasi AbWarehouse';
     el('loginError').classList.add('show');
     state.session = null;
     state.profile = null;
