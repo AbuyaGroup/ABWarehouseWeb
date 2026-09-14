@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ABWarehouse</title>
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tabler-icons/3.44.0/tabler-icons.min.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<!-- ============ LOGIN ============ -->
+<div id="loginScreen">
+  <div class="login-card">
+    <div class="login-brand"><div class="mark"><i class="ti ti-building-warehouse"></i></div><span>Abuya Inventory</span></div>
+    <p class="sub">Distribusi & Inventory</p>
+    <div class="login-error" id="loginError"></div>
+    <div class="field">
+      <label>Username</label>
+      <input type="text" id="loginEmail" placeholder="siapa nich?" autocomplete="username">
+    </div>
+    <div class="field">
+      <label>Password</label>
+      <input type="password" id="loginPassword" placeholder="passwordnya apa nich?" autocomplete="current-password">
+    </div>
+    <button class="btn-primary" id="loginBtn">Masuk</button>
+  </div>
+</div>
+
+<!-- ============ DC SELECTOR ============ -->
+<!-- ============ MAIN MENU (abis login) ============ -->
+<div id="mainMenuScreen" class="hidden">
+  <div class="topbar">
+    <div class="brand"><div class="mark"><i class="ti ti-building-warehouse"></i></div>Abuya Inventory</div>
+    <div class="topbar-right">
+      <span class="user-chip" id="userChip9"></span>
+      <button class="btn-ghost" id="logoutBtn8">Logout</button>
+    </div>
+  </div>
+  <div class="wrap">
+    <h1>Mau ngapain hari ini?</h1>
+    <p class="hint">Pilih menu buat lanjut</p>
+    <div class="dc-grid">
+      <button class="dc-card" id="menuStockOpnameBtn">
+        <div class="dc-icon"><i class="ti ti-clipboard-list"></i></div>
+        <div>
+          <p class="name">Stock Opname</p>
+          <p class="sub">Proses counting & sesi stock opname</p>
+        </div>
+        <div class="footer"><span>Mulai</span><i class="ti ti-arrow-right"></i></div>
+      </button>
+      <button class="dc-card hidden" id="menuMasterBtn">
+        <div class="dc-icon"><i class="ti ti-database-cog"></i></div>
+        <div>
+          <p class="name">Master</p>
+          <p class="sub">Kelola DC, Zona, Sector, dan Produk</p>
+        </div>
+        <div class="footer"><span>Buka</span><i class="ti ti-arrow-right"></i></div>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ DC SELECTOR (khusus Stock Opname) ============ -->
+<div id="selectorScreen" class="hidden">
+  <div class="topbar">
+    <button class="back-btn" id="backFromSelectorBtn"><i class="ti ti-arrow-left"></i> Menu lain</button>
+    <div class="brand"><div class="mark"><i class="ti ti-building-warehouse"></i></div>Abuya Inventory</div>
+    <div class="topbar-right">
+      <span class="user-chip" id="userChip"></span>
+      <button class="btn-ghost" id="logoutBtn1">Logout</button>
+    </div>
+  </div>
+  <div class="wrap">
+    <h1>Pilih Distribution Center</h1>
+    <p class="hint" id="selectorHint">Pilih DC untuk melihat Zona</p>
+    <div class="dc-grid" id="dcGrid"></div>
+  </div>
+</div>
+
+<!-- ============ MASTER MENU (Produk vs DC) ============ -->
+<div id="masterMenuScreen" class="hidden">
+  <div class="topbar">
+    <button class="back-btn" id="backFromMasterMenuBtn"><i class="ti ti-arrow-left"></i> Menu lain</button>
+    <div class="brand"><div class="mark"><i class="ti ti-database-cog"></i></div>Master Data</div>
+    <div class="topbar-right">
+      <span class="user-chip" id="userChip10"></span>
+      <button class="btn-ghost" id="logoutBtn10">Logout</button>
+    </div>
+  </div>
+  <div class="wrap">
+    <h1>Mau ngapain nich?</h1>
+    <p class="hint">Tempat kelola data produk dan distribution center</p>
+    <div class="dc-grid">
+      <button class="dc-card" id="masterMenuProdukBtn">
+        <div class="dc-icon"><i class="ti ti-package"></i></div>
+        <div>
+          <p class="name">Produk</p>
+          <p class="sub">Tambah/Edit/Hapus <em>item</em> baru</p>
+        </div>
+        <div class="footer"><span>Klik aje udeh</span><i class="ti ti-arrow-right"></i></div>
+      </button>
+      <button class="dc-card" id="masterMenuDcBtn">
+        <div class="dc-icon"><i class="ti ti-building-warehouse"></i></div>
+        <div>
+          <p class="name">DC</p>
+          <p class="sub">kelola DC, Zona, Sector, dan assign existing item ke sector</p>
+        </div>
+        <div class="footer"><span>Klik aje udeh</span><i class="ti ti-arrow-right"></i></div>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ MASTER: KELOLA PRODUK (global, gak nempel DC) ============ -->
+<div id="manageProdukMasterScreen" class="hidden">
+  <div class="topbar">
+    <button class="back-btn" id="backFromProdukMasterBtn"><i class="ti ti-arrow-left"></i> Menu lain</button>
+    <div class="brand"><div class="mark"><i class="ti ti-package"></i></div>Master Produk</div>
+    <div class="topbar-right">
+      <span class="user-chip" id="userChip11"></span>
+      <button class="btn-ghost" id="logoutBtn11">Logout</button>
+    </div>
+  </div>
+  <div class="dash-content">
+    <div class="produk-toolbar">
+      <div class="produk-toolbar-heading">
+        <h1 style="font-size:19px;font-weight:600;margin:0 0 4px;">Master Produk</h1>
+        <p class="hint" style="margin:0;">Semua produk yang terdaftar, lepas dari DC/Zona/Sector manapun.</p>
+      </div>
+      <div class="produk-toolbar-search">
+        <div class="search-box">
+          <i class="ti ti-search"></i>
+          <input type="text" id="produkMasterSearchInput" placeholder="Cari produk...">
+        </div>
+      </div>
+    </div>
+    <div class="admin-actions">
+      <button class="btn-ghost" id="addProdukMasterBtn"><i class="ti ti-plus"></i> Produk Baru</button>
+    </div>
+    <div class="produk-table-wrap" id="produkMasterTableWrap">
+      <table class="produk-table">
+        <colgroup>
+          <col style="width:14%"><col style="width:28%"><col style="width:18%">
+          <col style="width:17%"><col style="width:12%"><col style="width:11%">
+        </colgroup>
+        <thead>
+          <tr>
+            <th>Kategori</th>
+            <th>Produk</th>
+            <th>Barcode</th>
+            <th>Kode Produk</th>
+            <th>Satuan</th>
+            <th class="num">Aksi</th>
+          </tr>
+        </thead>
+        <tbody id="produkMasterGrid"></tbody>
+      </table>
+    </div>
+    <div class="pagination-bar hidden" id="produkMasterPagination">
+      <button class="pg-btn pg-text" id="produkMasterPageFirst">First</button>
+      <button class="pg-btn" id="produkMasterPagePrev"><i class="ti ti-chevrons-left"></i></button>
+      <div class="pg-numbers" id="produkMasterPageNumbers"></div>
+      <button class="pg-btn" id="produkMasterPageNext"><i class="ti ti-chevrons-right"></i></button>
+      <button class="pg-btn pg-text" id="produkMasterPageLast">Last</button>
+    </div>
+    <div class="empty-state hidden" id="emptyProdukMasterMsg"><p>Belum ada produk yang terdaftar.</p></div>
+  </div>
+</div>
+
+<!-- ============ MASTER: PILIH DC (admin, kelola data) ============ -->
+<div id="manageDcScreen" class="hidden">
+  <div class="topbar">
+    <button class="back-btn" id="backFromManageDcBtn"><i class="ti ti-arrow-left"></i> Master lain</button>
+    <div class="brand"><div class="mark"><i class="ti ti-database-cog"></i></div>Master Data</div>
+    <div class="topbar-right">
+      <span class="user-chip" id="userChip9b"></span>
+      <button class="btn-ghost" id="logoutBtn9">Logout</button>
+    </div>
+  </div>
+  <div class="wrap">
+    <div class="session-list-head">
+      <div>
+        <h1>Pilih Distribution Center</h1>
+        <p class="hint">Pilih DC buat kelola Zona, Sector, dan Produk-nya.</p>
+      </div>
+      <button class="btn-amber" id="addDcBtn"><i class="ti ti-plus"></i> DC Baru</button>
+    </div>
+    <div class="dc-grid" id="manageDcGrid"></div>
+  </div>
+</div>
+
+<!-- ============ SESSION LIST (CRUD) ============ -->
+<div id="sessionListScreen" class="hidden">
+  <div class="topbar">
+    <button class="back-btn" id="backToSelectorFromSessionBtn"><i class="ti ti-arrow-left"></i> DC lain</button>
+    <div class="brand" id="sessionListDcName"></div>
+    <div class="topbar-right">
+      <span class="user-chip" id="userChip3"></span>
+      <button class="btn-ghost" id="logoutBtn4">Logout</button>
+    </div>
+  </div>
+  <div class="wrap">
+    <div class="session-list-head">
+      <div>
+        <h1>Sesi Stock Opname</h1>
+        <p class="hint">Pilih sesi buat lanjut, atau bikin sesi baru</p>
+      </div>
+      <button class="btn-amber" id="newSessionBtn"><i class="ti ti-plus"></i> Sesi Baru</button>
+    </div>
+    <div class="session-list" id="sessionListGrid"></div>
+    <div class="empty-state hidden" id="emptySessionMsg"><p>Belum ada sesi opname buat DC ini.<br>Klik "Sesi Baru" buat mulai.</p></div>
+  </div>
+</div>
+
+<!-- ============ SESSION REVIEW (Konfirmasi Selesai) ============ -->
+<div id="sessionReviewScreen" class="hidden">
+  <div class="topbar">
+    <button class="back-btn" id="backFromReviewBtn"><i class="ti ti-arrow-left"></i> Batal</button>
+    <div class="brand" id="reviewSessionName"></div>
+    <div class="topbar-right">
+      <span class="user-chip" id="userChip5"></span>
+      <button class="btn-ghost" id="logoutBtn5">Logout</button>
+    </div>
+  </div>
+  <div class="wrap">
+    <h1>Review &amp; Konfirmasi Selesai</h1>
+    <p class="hint">Cek qty hasil counting, revisi kalau perlu di kolom "Qty Final", baru konfirmasi buat nutup sesi ini.</p>
+    <div class="review-table-wrap">
+      <table class="review-table">
+        <thead>
+          <tr>
+            <th>Nama Produk</th>
+            <th>Barcode</th>
+            <th>Sector</th>
+            <th class="num">Unit</th>
+            <th class="num">Qty Counting</th>
+            <th class="num">Qty Final</th>
+          </tr>
+        </thead>
+        <tbody id="reviewTableBody"></tbody>
+      </table>
+    </div>
+    <div class="empty-state hidden" id="emptyReviewMsg"><p>Belum ada produk yang discan di sesi ini.</p></div>
+    <div class="review-footer">
+      <button class="btn-ghost" id="cancelReviewBtn">Batal</button>
+      <button class="btn-success" id="confirmReviewBtn"><i class="ti ti-check"></i> Konfirmasi &amp; Selesaikan Sesi</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ ZONA SELECTOR ============ -->
+<div id="zonaScreen" class="hidden">
+  <div class="topbar">
+    <button class="back-btn" id="backToSelectorBtn"><i class="ti ti-arrow-left"></i> Sesi lain</button>
+    <div class="brand" id="zonaDcName"></div>
+    <div class="topbar-right">
+      <div class="view-toggle-wrap">
+        <button type="button" class="view-toggle" id="switchViewFromZonaBtn">
+          <span class="view-toggle-thumb"></span>
+        </button>
+        <span class="view-toggle-caption">Semua Zona / Semua Produk</span>
+      </div>
+      <span class="user-chip" id="userChip2"></span>
+      <button class="btn-ghost" id="logoutBtn3">Logout</button>
+    </div>
+  </div>
+  <div class="wrap">
+    <div class="session-list-head">
+      <div>
+        <h1>Pilih Zona</h1>
+        <p class="hint">Pilih Zona untuk melihat produk di area itu · <span class="session-name-label" id="zonaSessionLabel"></span></p>
+      </div>
+    </div>
+    <div class="zona-picker-grid" id="zonaGrid"></div>
+    <div class="empty-state hidden" id="emptyZonaListMsg"><p>Belum ada zona yang terdaftar buat DC ini.</p></div>
+  </div>
+</div>
+
+<!-- ============ DASHBOARD ============ -->
+<div id="dashboardScreen" class="hidden">
+  <div class="topbar">
+    <button class="back-btn" id="backBtn"><i class="ti ti-arrow-left"></i> Zona lain</button>
+    <div class="brand" id="dashDcName"></div>
+    <div class="topbar-right">
+      <div class="view-toggle-wrap">
+        <button type="button" class="view-toggle" id="switchViewBtn">
+          <span class="view-toggle-thumb"></span>
+        </button>
+        <span class="view-toggle-caption">Semua Zona / Semua Produk</span>
+      </div>
+      <span class="user-chip" id="userChip6"></span>
+      <button class="btn-ghost" id="logoutBtn2">Logout</button>
+    </div>
+  </div>
+  <div class="dash-content">
+    <div class="produk-toolbar">
+      <div class="produk-toolbar-heading">
+        <div class="all-dc-header hidden" id="allDcHeader">
+          <h1>Semua Produk</h1>
+          <p class="hint" id="allDcSessionHint"></p>
+        </div>
+        <div class="session-bar" id="sessionBar">
+          <span class="session-name-label" id="sessionNameLabel"></span>
+        </div>
+      </div>
+      <div class="produk-toolbar-search">
+        <div class="search-box">
+          <i class="ti ti-search"></i>
+          <input type="text" id="searchInput" placeholder="Cari produk...">
+        </div>
+        <select id="sectorFilterSelect" class="sector-filter">
+          <option value="">Semua Sector</option>
+        </select>
+      </div>
+    </div>
+    <div class="produk-table-wrap" id="produkTableWrap">
+      <table class="produk-table">
+        <colgroup>
+          <col style="width:15%"><col style="width:35%"><col style="width:16%">
+          <col style="width:17%"><col style="width:17%">
+        </colgroup>
+        <thead>
+          <tr>
+            <th>Kategori</th>
+            <th>Produk</th>
+            <th class="num">Jumlah</th>
+            <th>Scanner</th>
+            <th>Sector</th>
+          </tr>
+        </thead>
+        <tbody id="produkGrid"></tbody>
+      </table>
+    </div>
+    <div class="pagination-bar hidden" id="produkPagination">
+      <button class="pg-btn pg-text" id="produkPageFirst">First</button>
+      <button class="pg-btn" id="produkPagePrev"><i class="ti ti-chevrons-left"></i></button>
+      <div class="pg-numbers" id="produkPageNumbers"></div>
+      <button class="pg-btn" id="produkPageNext"><i class="ti ti-chevrons-right"></i></button>
+      <button class="pg-btn pg-text" id="produkPageLast">Last</button>
+    </div>
+    <div class="empty-state hidden" id="noSessionMsg">
+      <p>Memuat sesi opname...</p>
+    </div>
+    <div class="empty-state hidden" id="emptyZonaMsg">
+      <p>Belum ada produk yang ke-assign ke sector di zona ini.<br>Hubungi admin buat nambahin produk ke sector lewat Supabase (tabel produk_sectors).</p>
+    </div>
+  </div>
+  <div class="footer-bar">
+    <div class="footer-stat">Produk dicek<b id="statChecked">0/0</b></div>
+  </div>
+</div>
+
+<!-- ============ MODAL: CREATE / EDIT SESI ============ -->
+<div id="sessionModal" class="modal-overlay hidden">
+  <div class="modal-card">
+    <h2 id="sessionModalTitle">Sesi Baru</h2>
+    <div class="field">
+      <label>Nama Sesi</label>
+      <input type="text" id="sessionModalNama" placeholder="cth: Opname Juli 2026">
+    </div>
+    <div class="field" style="margin-bottom:0;">
+      <label>Tanggal Stock Opname</label>
+      <input type="date" id="sessionModalTanggal">
+    </div>
+    <div class="modal-actions">
+      <button class="btn-ghost" id="sessionModalCancel">Batal</button>
+      <button class="btn-amber" id="sessionModalSave">Simpan</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ MODAL: HAPUS SESI ============ -->
+<div id="deleteModal" class="modal-overlay hidden">
+  <div class="modal-card">
+    <h2>Hapus Sesi?</h2>
+    <p class="modal-desc" id="deleteModalText"></p>
+    <div class="modal-actions">
+      <button class="btn-ghost" id="deleteModalCancel">Batal</button>
+      <button class="btn-danger" id="deleteModalConfirm">Hapus</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ MODAL: EXPORT SESI ============ -->
+<div id="exportModal" class="modal-overlay hidden">
+  <div class="modal-card">
+    <h2>Export Sesi</h2>
+    <p class="modal-desc" id="exportModalDesc" style="margin-bottom:16px;"></p>
+
+    <!-- Step 1: pilih jenis export -->
+    <div id="exportOptionsStep">
+      <button class="export-option" id="exportOptionPdf">
+        <span class="ico"><i class="ti ti-file-type-pdf"></i></span>
+        <span class="txt">
+          <span class="label">Counting 1 (PDF)</span>
+          <span class="desc">Lembar counting per sector, siap print & gunting</span>
+        </span>
+      </button>
+      <button class="export-option" id="exportOptionXlsx">
+        <span class="ico"><i class="ti ti-file-type-xls"></i></span>
+        <span class="txt">
+          <span class="label">SO Template (Excel)</span>
+          <span class="desc" id="exportOptionXlsxDesc">Qty final hasil otorisasi admin</span>
+        </span>
+      </button>
+      <div class="modal-actions">
+        <button class="btn-ghost" id="exportModalCancel">Batal</button>
+      </div>
+    </div>
+
+    <!-- Step 2: pilih Zona -> Sector, khusus buat Counting 1 (PDF) -->
+    <div id="exportPdfStep" class="hidden">
+      <div class="field">
+        <label>Zona</label>
+        <select id="exportZonaSelect"></select>
+      </div>
+      <div class="field" style="margin-bottom:0;">
+        <label>Sector</label>
+        <select id="exportSectorSelect"></select>
+      </div>
+      <div class="modal-actions">
+        <button class="btn-ghost" id="exportPdfBack">Kembali</button>
+        <button class="btn-amber" id="exportPdfConfirm">Cetak PDF</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ KELOLA DATA: PILIH ZONA (admin, lepas dari sesi) ============ -->
+<div id="manageZonaScreen" class="hidden">
+  <div class="topbar">
+    <button class="back-btn" id="backFromManageZonaBtn"><i class="ti ti-arrow-left"></i> DC lain</button>
+    <div class="brand" id="manageZonaDcName"></div>
+    <div class="topbar-right">
+      <span class="user-chip" id="userChip7"></span>
+      <button class="btn-ghost" id="logoutBtn6">Logout</button>
+    </div>
+  </div>
+  <div class="wrap">
+    <div class="session-list-head">
+      <div>
+        <h1>Kelola Data — Pilih Zona</h1>
+        <p class="hint">Tambah/liat Zona, Sector, dan Produk buat DC ini — lepas dari sesi opname manapun.</p>
+      </div>
+      <button class="btn-amber" id="addZonaBtn"><i class="ti ti-plus"></i> Zona Baru</button>
+    </div>
+    <div class="zona-picker-grid" id="manageZonaGrid"></div>
+    <div class="empty-state hidden" id="emptyManageZonaMsg"><p>Belum ada zona yang terdaftar buat DC ini.<br>Klik "Zona Baru" buat mulai.</p></div>
+  </div>
+</div>
+
+<!-- ============ KELOLA DATA: SECTOR & PRODUK (admin, lepas dari sesi) ============ -->
+<div id="manageProdukScreen" class="hidden">
+  <div class="topbar">
+    <button class="back-btn" id="backFromManageProdukBtn"><i class="ti ti-arrow-left"></i> Zona lain</button>
+    <div class="brand" id="manageProdukZonaName"></div>
+    <div class="topbar-right">
+      <span class="user-chip" id="userChip8"></span>
+      <button class="btn-ghost" id="logoutBtn7">Logout</button>
+    </div>
+  </div>
+  <div class="dash-content">
+    <div class="produk-toolbar">
+      <div class="produk-toolbar-heading">
+        <h1 style="font-size:19px;font-weight:600;margin:0;">Sector &amp; Produk</h1>
+      </div>
+      <div class="produk-toolbar-search">
+        <div class="search-box">
+          <i class="ti ti-search"></i>
+          <input type="text" id="manageSearchInput" placeholder="Cari produk...">
+        </div>
+        <select id="manageSectorFilterSelect" class="sector-filter">
+          <option value="">Semua Sector</option>
+        </select>
+      </div>
+    </div>
+    <div class="admin-actions" id="manageAdminActions">
+      <button class="btn-ghost" id="addSectorBtn"><i class="ti ti-plus"></i> Sector Baru</button>
+      <button class="btn-ghost" id="addProdukBtn"><i class="ti ti-plus"></i> Produk Baru</button>
+    </div>
+    <div class="sector-manage-list" id="sectorManageList"></div>
+    <div class="produk-table-wrap" id="manageProdukTableWrap">
+      <table class="produk-table">
+        <colgroup>
+          <col style="width:13%"><col style="width:27%"><col style="width:18%">
+          <col style="width:12%"><col style="width:15%"><col style="width:15%">
+        </colgroup>
+        <thead>
+          <tr>
+            <th>Kategori</th>
+            <th>Produk</th>
+            <th>Barcode</th>
+            <th>Satuan</th>
+            <th>Sector</th>
+            <th class="num">Aksi</th>
+          </tr>
+        </thead>
+        <tbody id="manageProdukGrid"></tbody>
+      </table>
+    </div>
+    <div class="empty-state hidden" id="emptyManageProdukMsg">
+      <p>Belum ada produk yang ke-assign ke sector di zona ini.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ============ MODAL: DC BARU (admin) ============ -->
+<div id="dcModal" class="modal-overlay hidden">
+  <div class="modal-card">
+    <h2 id="dcModalTitle">DC Baru</h2>
+    <div class="field">
+      <label>ID (unik, huruf kecil, cth: dc-c)</label>
+      <input type="text" id="dcModalId" placeholder="dc-c">
+    </div>
+    <div class="field">
+      <label>Nama</label>
+      <input type="text" id="dcModalNama" placeholder="cth: DC C">
+    </div>
+    <div class="field">
+      <label>Sub-judul (opsional)</label>
+      <input type="text" id="dcModalSub" placeholder="cth: Jakarta Timur">
+    </div>
+    <div class="field" style="margin-bottom:0;">
+      <label>Icon Tabler (opsional)</label>
+      <input type="text" id="dcModalIcon" placeholder="ti-building-warehouse">
+    </div>
+    <div class="modal-actions">
+      <button class="btn-ghost" id="dcModalCancel">Batal</button>
+      <button class="btn-amber" id="dcModalSave">Simpan</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ MODAL: ZONA BARU (admin) ============ -->
+<div id="zoneModal" class="modal-overlay hidden">
+  <div class="modal-card">
+    <h2 id="zoneModalTitle">Zona Baru</h2>
+    <div class="field">
+      <label>ID (unik, cth: dc-b-p)</label>
+      <input type="text" id="zoneModalId" placeholder="dc-b-p">
+    </div>
+    <div class="field" style="margin-bottom:0;">
+      <label>Nama</label>
+      <input type="text" id="zoneModalNama" placeholder="cth: P">
+    </div>
+    <div class="modal-actions">
+      <button class="btn-ghost" id="zoneModalCancel">Batal</button>
+      <button class="btn-amber" id="zoneModalSave">Simpan</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ MODAL: SECTOR BARU (admin) ============ -->
+<div id="sectorModal" class="modal-overlay hidden">
+  <div class="modal-card">
+    <h2 id="sectorModalTitle">Sector Baru</h2>
+    <p class="modal-desc" id="sectorModalZonaInfo" style="margin-bottom:16px;"></p>
+    <div class="field">
+      <label>ID (unik, cth: dc-b-p-001)</label>
+      <input type="text" id="sectorModalId" placeholder="dc-b-p-001">
+    </div>
+    <div class="field" style="margin-bottom:0;">
+      <label>Nama</label>
+      <input type="text" id="sectorModalNama" placeholder="cth: P001">
+    </div>
+    <div class="modal-actions">
+      <button class="btn-ghost" id="sectorModalCancel">Batal</button>
+      <button class="btn-amber" id="sectorModalSave">Simpan</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ MODAL: PRODUK BARU (admin) ============ -->
+<div id="produkModal" class="modal-overlay hidden">
+  <div class="modal-card">
+    <h2>Assign Produk ke Sector</h2>
+    <p class="modal-desc" style="margin-bottom:16px;">Cari produk yang udah terdaftar di Master Produk, terus assign ke sector ini. Belum ada produknya? Bikin dulu lewat menu Master → Produk.</p>
+    <div class="field">
+      <label>Cari Produk (nama / barcode / kode)</label>
+      <input type="text" id="assignProdukSearch" placeholder="Ketik buat cari...">
+      <div class="assign-produk-results" id="assignProdukResults"></div>
+    </div>
+    <div class="field hidden" id="assignProdukSelectedWrap">
+      <label>Produk Terpilih</label>
+      <div class="assign-produk-selected" id="assignProdukSelected"></div>
+    </div>
+    <div class="field" style="margin-bottom:0;">
+      <label>Assign ke Sector</label>
+      <select id="produkModalSector"></select>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-ghost" id="produkModalCancel">Batal</button>
+      <button class="btn-amber" id="produkModalSave" disabled>Simpan</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ MODAL: PRODUK BARU / EDIT PRODUK (Master, global) ============ -->
+<div id="produkMasterModal" class="modal-overlay hidden">
+  <div class="modal-card">
+    <h2 id="produkMasterModalTitle">Produk Baru</h2>
+    <div class="field">
+      <label>Barcode</label>
+      <input type="text" id="produkMasterModalBarcode" placeholder="cth: B290720260099">
+    </div>
+    <div class="field">
+      <label>Nama Produk</label>
+      <input type="text" id="produkMasterModalNama" placeholder="cth: Sambal Bawang Sachet">
+    </div>
+    <div class="field">
+      <label>Kode Produk (opsional)</label>
+      <input type="text" id="produkMasterModalKode" placeholder="cth: A011099">
+    </div>
+    <div class="field">
+      <label>Kategori (opsional)</label>
+      <input type="text" id="produkMasterModalKategori" placeholder="cth: FOOD">
+    </div>
+    <div class="field">
+      <label>Sub Kategori (opsional)</label>
+      <input type="text" id="produkMasterModalSubKategori" placeholder="cth: Bumbu">
+    </div>
+    <div class="field" style="margin-bottom:0;">
+      <label>Satuan (opsional)</label>
+      <input type="text" id="produkMasterModalSatuan" placeholder="cth: pack">
+    </div>
+    <div class="modal-actions">
+      <button class="btn-ghost" id="produkMasterModalCancel">Batal</button>
+      <button class="btn-amber" id="produkMasterModalSave">Simpan</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/00-config.js"></script>
+<script src="js/01-auth.js"></script>
+<script src="js/02-sessions.js"></script>
+<script src="js/03-export.js"></script>
+<script src="js/04-session-review.js"></script>
+<script src="js/05-print.js"></script>
+<script src="js/06-dashboard.js"></script>
+<script src="js/08-manage-data.js"></script>
+<script src="js/09-master-produk.js"></script>
+<script src="js/07-init.js"></script>
+</body>
+</html>
