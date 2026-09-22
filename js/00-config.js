@@ -101,3 +101,67 @@ function renderPaginationBar({ prefix, page, totalPages, onGoTo }){
   el(`${prefix}PagePrev`).onclick = () => onGoTo(Math.max(1, page - 1));
   el(`${prefix}PageNext`).onclick = () => onGoTo(Math.min(totalPages, page + 1));
 }
+
+function enhanceSelect(selectId){
+  const nativeSelect = el(selectId);
+  if(!nativeSelect || nativeSelect.dataset.enhanced) return;
+  nativeSelect.dataset.enhanced = 'true';
+
+  const wrap = document.createElement('div');
+  wrap.className = 'fancy-select';
+  nativeSelect.parentNode.insertBefore(wrap, nativeSelect);
+  wrap.appendChild(nativeSelect);
+  nativeSelect.classList.add('fancy-select-native');
+
+  const trigger = document.createElement('button');
+  trigger.type = 'button';
+  trigger.className = 'fancy-select-trigger';
+  wrap.appendChild(trigger);
+
+  const popover = document.createElement('div');
+  popover.className = 'fancy-select-popover';
+  wrap.appendChild(popover);
+
+  function closePopover(){
+    popover.classList.remove('open');
+    trigger.classList.remove('active');
+    document.removeEventListener('click', onOutsideClick, true);
+  }
+
+  function openPopover(){
+    popover.classList.add('open');
+    trigger.classList.add('active');
+    document.addEventListener('click', onOutsideClick, true);
+  }
+
+  function onOutsideClick(e){
+    if(!wrap.contains(e.target)) closePopover();
+  }
+
+  function syncFromNative(){
+    const selectedOption = nativeSelect.options[nativeSelect.selectedIndex];
+    trigger.innerHTML = `<span class="fancy-select-label">${selectedOption ? selectedOption.textContent : ''}</span><i class="ti ti-chevron-down fancy-select-chevron"></i>`;
+
+    popover.innerHTML = Array.from(nativeSelect.options).map((opt, idx) =>
+      `<button type="button" class="fancy-select-option${idx === nativeSelect.selectedIndex ? ' active' : ''}" data-idx="${idx}">${opt.textContent}</button>`
+    ).join('');
+
+    popover.querySelectorAll('[data-idx]').forEach(item => {
+      item.onclick = () => {
+        nativeSelect.selectedIndex = Number(item.getAttribute('data-idx'));
+        nativeSelect.dispatchEvent(new Event('change', { bubbles: true }));
+        closePopover();
+      };
+    });
+  }
+
+  trigger.onclick = () => {
+    if(popover.classList.contains('open')) closePopover();
+    else openPopover();
+  };
+
+  new MutationObserver(syncFromNative).observe(nativeSelect, { childList: true, subtree: true });
+  nativeSelect.addEventListener('change', syncFromNative);
+
+  syncFromNative();
+}

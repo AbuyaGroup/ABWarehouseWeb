@@ -59,6 +59,8 @@ el('exportOptionPdf').onclick = async () => {
   }
 
   zonaSelect.innerHTML = zonesData.map(z => `<option value="${z.id}">${z.nama}</option>`).join('');
+  enhanceSelect('exportZonaSelect');
+  enhanceSelect('exportSectorSelect');
   await loadSectorOptionsForExport(zonaSelect.value);
 };
 

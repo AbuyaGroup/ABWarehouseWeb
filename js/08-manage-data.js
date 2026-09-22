@@ -272,6 +272,8 @@ el('manageSectorFilterSelect').addEventListener('change', (e) => {
   renderManageProdukList();
 });
 
+enhanceSelect('manageSectorFilterSelect');
+
 el('backFromManageProdukBtn').onclick = () => {
   hide('manageProdukScreen');
   show('manageZonaScreen');
@@ -442,6 +444,7 @@ async function openAssignProdukModal(){
   el('produkModalSector').innerHTML = state.sectorsList
     .map(s => `<option value="${s.id}">${s.nama}</option>`).join('');
   el('produkModalSector').value = state.sectorFilter || state.sectorsList[0].id;
+  enhanceSelect('produkModalSector');
   el('produkModalSave').disabled = true;
   el('produkModalSave').textContent = 'Simpan';
 

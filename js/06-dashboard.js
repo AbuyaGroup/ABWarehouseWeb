@@ -158,6 +158,8 @@ el('sectorFilterSelect').addEventListener('change', (e) => {
   renderDashboard();
 });
 
+enhanceSelect('sectorFilterSelect');
+
 function renderDashboard(){
 
   const produkZonaIni = state.sectorFilter
