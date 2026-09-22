@@ -1,6 +1,3 @@
-// =========================================================
-// INIT — cek udah login apa belum
-// =========================================================
 (async function init(){
   if(SKIP_LOGIN){
     state.profile = { role: 'admin', nama: 'Mode Testing (tanpa login)' };

@@ -1,24 +1,15 @@
-// =========================================================
-// PRINT COUNTING SHEET (PDF) -- dari list sesi
-// =========================================================
-// Format ngikutin Format_Print_out.xlsx: kolom Scanner / Zona Number /
-// Squence / Nama Produk / Unit / Counting 2 / Counting 1.
-// Sekarang di-scope ke SATU sector aja (dipilih user lewat Zona -> Sector
-// di modal export), bukan semua sector se-DC sekaligus.
-// Satu halaman A4 = sector itu, dicetak 2x (atas & bawah) biar bisa digunting.
 async function printSessionPdf(sessionId, sectorId){
   const session = state.sessions.find(x => x.id === sessionId);
   if(!session) return;
   if(!sectorId){ alert('Pilih sector dulu.'); return; }
 
   try {
-    // 1. Detail sector yang dipilih
+
     const { data: sectorRow, error: sectorErr } = await sb
       .from('sectors').select('id, nama, zone_id').eq('id', sectorId).maybeSingle();
     if(sectorErr) throw sectorErr;
     if(!sectorRow){ alert('Sector gak ketemu.'); return; }
 
-    // 2. Semua produk yang ke-assign ke sector ini (via produk_sectors)
     const { data: psData, error: psErr } = await sb
       .from('produk_sectors')
       .select('barcode, sector_id, master_produk(nama, satuan)')
@@ -29,7 +20,6 @@ async function printSessionPdf(sessionId, sectorId){
       return;
     }
 
-    // 3. Hasil scan (opname_entries) buat sesi + sector ini, biar tau qty & siapa yang scan
     const { data: entriesData, error: entriesErr } = await sb
       .from('opname_entries')
       .select('barcode, sector_id, qty_fisik, updated_by, profiles(nama)')
@@ -37,8 +27,6 @@ async function printSessionPdf(sessionId, sectorId){
       .eq('sector_id', sectorId);
     if(entriesErr) throw entriesErr;
 
-    // Key gabungan barcode+sector_id -- barcode yang sama bisa punya qty
-    // beda-beda di tiap sector, jadi gak bisa di-key barcode doang.
     const entriesByKey = {};
     (entriesData || []).forEach(e => { entriesByKey[`${e.barcode}|${e.sector_id}`] = e; });
 
@@ -56,17 +44,14 @@ async function printSessionPdf(sessionId, sectorId){
       return [scannerNama, sectorRow.nama, i + 1, ps.master_produk?.nama || '(produk tak dikenal)', ps.master_produk?.satuan || '', '', qty];
     });
 
-    // Copy 1 -- separuh atas halaman
     drawCountingSheetCopy(doc, 8, header, rows, dcNama, session, sectorRow);
 
-    // Garis putus-putus di tengah halaman, buat panduan gunting
     doc.setLineDashPattern([2, 1.5], 0);
     doc.line(6, halfH, pageW - 6, halfH);
     doc.setLineDashPattern([], 0);
     doc.setFontSize(7);
     doc.text('- - - - -  GUNTING DI SINI  - - - - -', pageW / 2, halfH - 1.5, { align: 'center' });
 
-    // Copy 2 -- separuh bawah halaman
     drawCountingSheetCopy(doc, halfH + 8, header, rows, dcNama, session, sectorRow);
 
     const dcFileNama = dcNama.replace(/\s+/g, '_') || 'DC';
@@ -79,8 +64,6 @@ async function printSessionPdf(sessionId, sectorId){
   }
 }
 
-// Gambar satu copy tabel counting sheet, mulai dari startY (dipake 2x per
-// halaman -- sekali buat separuh atas, sekali buat separuh bawah).
 function drawCountingSheetCopy(doc, startY, header, rows, dcNama, session, sector){
   doc.setFontSize(14);
   doc.setFont(undefined, 'bold');
@@ -122,8 +105,6 @@ async function openSession(id){
   await loadEntries();
   updateSessionNameLabels();
 
-  // Ambil dc_id dari sesi yang barusan diklik (opname_sessions.dc_id),
-  // dipakai buat filter tabel 'zones' biar cuma nampilin zona milik DC ini.
   const session = state.sessions.find(x => x.id === id);
   const dcId = session ? session.dc_id : state.currentDc.id;
 
@@ -136,7 +117,6 @@ async function openSession(id){
   show('zonaScreen');
 }
 
-// Muat daftar zona dari tabel 'zones', difilter berdasarkan dc_id.
 async function loadZones(dcId){
   const { data, error } = await sb.from('zones').select('*').eq('dc_id', dcId).order('nama');
   if(error){
@@ -197,8 +177,6 @@ async function openZona(zonaId){
   setSync(true, 'tersambung');
 }
 
-// Mode "Semua Item" -- nampilin semua produk se-DC B, ngelewatin batasan
-// per-zona. Dipake buat lihat gambaran lengkap tanpa perlu gonta-ganti zona.
 async function switchToAllDcView(){
   state.viewAllDc = true;
   state.currentZonaId = null;
@@ -231,7 +209,7 @@ el('switchViewFromZonaBtn').onclick = () => switchToAllDcView();
 
 el('switchViewBtn').onclick = () => {
   if(state.viewAllDc){
-    // Balik ke tampilan pilih Zona
+
     if(state.realtimeChannel){ sb.removeChannel(state.realtimeChannel); state.realtimeChannel = null; }
     state.viewAllDc = false;
     el('switchViewBtn').classList.remove('is-all');
@@ -241,4 +219,3 @@ el('switchViewBtn').onclick = () => {
     switchToAllDcView();
   }
 };
-

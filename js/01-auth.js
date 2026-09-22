@@ -1,14 +1,8 @@
-// =========================================================
-// AUTH
-// =========================================================
 el('loginBtn').onclick = doLogin;
 el('loginPassword').addEventListener('keydown', e => { if(e.key === 'Enter') doLogin(); });
 
-// Domain internal buat akun Supabase. User cuma perlu inget username-nya
-// doang, domain ini nempel otomatis di belakang layar.
 const EMAIL_DOMAIN = 'abuyagroup.com';
 
-// Terima input "budi" ATAU "budi@abuyagroup.com" -- dua-duanya jalan.
 function buildLoginEmail(input){
   const trimmed = (input || '').trim();
   if(trimmed.includes('@')) return trimmed;
@@ -41,8 +35,6 @@ async function loadProfile(){
   if(!error && data) state.profile = data;
 }
 
-// Klaim sesi: generate token baru, simpen ke profiles. Ini otomatis
-// "ngusir" device lain yang login pake akun yang sama.
 async function claimSession(){
   state.mySessionToken = crypto.randomUUID();
   await sb.from('profiles').update({ active_session_token: state.mySessionToken }).eq('id', state.session.user.id);
@@ -92,4 +84,3 @@ async function afterLogin(){
 [el('logoutBtn1'), el('logoutBtn2')].forEach(btn => {
   btn.onclick = () => forceLogout();
 });
-

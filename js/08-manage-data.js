@@ -1,10 +1,3 @@
-// =========================================================
-// KELOLA DATA (admin doang) -- nambahin Zona, Sector, Produk
-// LEPAS dari alur sesi opname manapun. Diakses dari tombol
-// "Kelola Data" di kartu DC (selectorScreen).
-// =========================================================
-
-// -------- Master: Pilih DC (grid + create/edit/delete) --------
 function renderManageDcGrid(){
   el('manageDcGrid').innerHTML = state.dcs.map(dc => `
     <div class="dc-card">
@@ -43,15 +36,12 @@ el('backFromManageDcBtn').onclick = () => {
 
 el('logoutBtn9').onclick = () => forceLogout();
 
-// =========================================================
-// MODAL: DC BARU / EDIT DC
-// =========================================================
 function openDcModal(mode, dc){
   state.dcModalMode = mode;
   state.dcModalEditingId = dc ? dc.id : null;
 
   el('dcModalTitle').textContent = mode === 'create' ? 'DC Baru' : 'Edit DC';
-  el('dcModalId').disabled = mode === 'edit'; // id itu primary key, dikunci pas edit
+  el('dcModalId').disabled = mode === 'edit';
   el('dcModalId').value = mode === 'edit' ? dc.id : '';
   el('dcModalNama').value = mode === 'edit' ? dc.nama : '';
   el('dcModalSub').value = mode === 'edit' ? (dc.sub || '') : '';
@@ -100,8 +90,6 @@ el('dcModalSave').onclick = async () => {
   closeDcModal();
 };
 
-// Hapus DC -- kalau masih ada Zona/Sector/Produk/Sesi opname yang nempel,
-// Supabase bakal nolak (FK constraint) biar data histori gak ilang diem-diem.
 async function deleteDc(dcId){
   const dc = state.dcs.find(x => x.id === dcId);
   if(!dc) return;
@@ -121,7 +109,6 @@ async function deleteDc(dcId){
   renderManageDcGrid();
 }
 
-// -------- Kelola Data: Pilih Zona --------
 async function openManageZona(dcId){
   state.currentDc = state.dcs.find(d => d.id === dcId);
   if(!state.currentDc) return;
@@ -180,7 +167,6 @@ el('backFromManageZonaBtn').onclick = () => {
 
 el('logoutBtn6').onclick = () => forceLogout();
 
-// -------- Kelola Data: Sector & Produk (per Zona) --------
 async function openManageProduk(zonaId){
   const zona = state.zonesList.find(z => z.id === zonaId);
   state.currentZonaId = zonaId;
@@ -208,7 +194,6 @@ function renderManageSectorFilterOptions(){
   sel.value = state.sectorFilter || '';
 }
 
-// List chip Sector di zona ini, tiap chip ada tombol edit & delete.
 function renderSectorManageList(){
   if(!state.sectorsList.length){
     el('sectorManageList').innerHTML = '';
@@ -233,8 +218,6 @@ function renderSectorManageList(){
   });
 }
 
-// List produk versi "kelola data" -- simpel, gak ada qty/counting/scanned-by
-// soalnya ini emang gak nempel ke sesi opname manapun.
 function renderManageProdukList(){
   const produkZonaIni = state.sectorFilter
     ? state.produkList.filter(p => p.sector_id === state.sectorFilter)
@@ -296,15 +279,12 @@ el('backFromManageProdukBtn').onclick = () => {
 
 el('logoutBtn7').onclick = () => forceLogout();
 
-// =========================================================
-// MODAL: ZONA BARU / EDIT ZONA
-// =========================================================
 function openZoneModal(mode, zona){
   state.zoneModalMode = mode;
   state.zoneModalEditingId = zona ? zona.id : null;
 
   el('zoneModalTitle').textContent = mode === 'create' ? 'Zona Baru' : 'Edit Zona';
-  el('zoneModalId').disabled = mode === 'edit'; // id itu primary key, dikunci pas edit
+  el('zoneModalId').disabled = mode === 'edit';
   el('zoneModalId').value = mode === 'edit' ? zona.id : '';
   el('zoneModalNama').value = mode === 'edit' ? zona.nama : '';
   el('zoneModalSave').disabled = false;
@@ -349,10 +329,6 @@ el('zoneModalSave').onclick = async () => {
   closeZoneModal();
 };
 
-// Hapus zona -- kalau masih ada sector/produk_sectors di dalemnya, itu ikut
-// kehapus (ON DELETE CASCADE). Kalau ada opname_entries yang udah pernah
-// nyantol ke sector di zona ini, Supabase bakal nolak (FK constraint) --
-// itu emang sengaja, biar data hasil scan yang udah ada gak ke-hapus diem2.
 async function deleteZona(zonaId){
   const zona = state.zonesList.find(z => z.id === zonaId);
   if(!zona) return;
@@ -372,9 +348,6 @@ async function deleteZona(zonaId){
   renderManageZonaGrid();
 }
 
-// =========================================================
-// MODAL: SECTOR BARU / EDIT SECTOR
-// =========================================================
 function openSectorModal(mode, sector){
   state.sectorModalMode = mode;
   state.sectorModalEditingId = sector ? sector.id : null;
@@ -383,7 +356,7 @@ function openSectorModal(mode, sector){
   el('sectorModalZonaInfo').textContent = mode === 'create'
     ? `Sector ini bakal dibikin di dalem Zona: ${state.currentZona}`
     : `Sector ini ada di dalem Zona: ${state.currentZona}`;
-  el('sectorModalId').disabled = mode === 'edit'; // id itu primary key, dikunci pas edit
+  el('sectorModalId').disabled = mode === 'edit';
   el('sectorModalId').value = mode === 'edit' ? sector.id : '';
   el('sectorModalNama').value = mode === 'edit' ? sector.nama : '';
   el('sectorModalSave').disabled = false;
@@ -433,10 +406,6 @@ el('sectorModalSave').onclick = async () => {
   closeSectorModal();
 };
 
-// Hapus sector -- assignment produk di sector ini (produk_sectors) ikut
-// kehapus (CASCADE). Kalau sector ini udah pernah dipake buat scan (ada
-// row-nya di opname_entries), Supabase bakal nolak otomatis (FK constraint)
-// biar data histori gak ilang.
 async function deleteSector(sectorId){
   const sector = state.sectorsList.find(s => s.id === sectorId);
   if(!sector) return;
@@ -459,13 +428,6 @@ async function deleteSector(sectorId){
   renderManageProdukList();
 }
 
-// =========================================================
-// MODAL: ASSIGN PRODUK KE SECTOR
-// Cari produk yang UDAH ada di master_produk (dikelola dari menu
-// Master > Produk), terus assign ke sector yang lagi dibuka. Modal ini
-// GAK bisa bikin produk baru lagi -- itu sekarang cuma bisa dari
-// Master > Produk.
-// =========================================================
 async function openAssignProdukModal(){
   if(!state.sectorsList.length){
     alert('Belum ada sector yang bisa dipilih. Bikin sector dulu.');
@@ -483,7 +445,6 @@ async function openAssignProdukModal(){
   el('produkModalSave').disabled = true;
   el('produkModalSave').textContent = 'Simpan';
 
-  // Cache semua master_produk sekali aja (dipake buat filter cari di client)
   if(!state.allMasterProduk.length){
     const { data, error } = await sb.from('master_produk').select('*').order('nama');
     if(!error) state.allMasterProduk = data || [];
@@ -568,7 +529,7 @@ el('produkModalSave').onclick = async () => {
   el('produkModalSave').textContent = 'Menyimpan...';
 
   try {
-    // Cek udah ke-assign ke sector ini apa belum, biar gak dobel
+
     const { data: existingPs, error: psFindErr } = await sb
       .from('produk_sectors').select('id').eq('barcode', produk.barcode).eq('sector_id', sectorId).maybeSingle();
     if(psFindErr) throw psFindErr;
@@ -596,8 +557,6 @@ el('produkModalSave').onclick = async () => {
   }
 };
 
-// Hapus assignment produk dari sector ini doang -- master_produk-nya sendiri
-// (dan assignment di sector laen kalau ada) TETEP UTUH, gak ikut kehapus.
 async function deleteProdukSector(psId, namaProduk){
   const confirmed = confirm(`Hapus "${namaProduk}" dari sector ini? (data produk & assignment di sector laen gak kepengaruh)`);
   if(!confirmed) return;

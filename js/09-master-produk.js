@@ -1,7 +1,3 @@
-// =========================================================
-// MASTER > PRODUK -- kelola master_produk secara global,
-// LEPAS dari DC/Zona/Sector manapun.
-// =========================================================
 el('masterMenuProdukBtn').onclick = () => {
   hide('masterMenuScreen');
   el('userChip11').innerHTML = el('userChip10').innerHTML;
@@ -102,15 +98,12 @@ el('produkMasterSearchInput').addEventListener('input', (e) => {
   renderProdukMasterGrid();
 });
 
-// =========================================================
-// MODAL: PRODUK BARU / EDIT PRODUK (master_produk, global)
-// =========================================================
 function openProdukMasterModal(mode, produk){
   state.produkMasterModalMode = mode;
   state.produkMasterModalEditingBarcode = produk ? produk.barcode : null;
 
   el('produkMasterModalTitle').textContent = mode === 'create' ? 'Produk Baru' : 'Edit Produk';
-  el('produkMasterModalBarcode').disabled = mode === 'edit'; // barcode itu primary key, dikunci pas edit
+  el('produkMasterModalBarcode').disabled = mode === 'edit';
 
   el('produkMasterModalBarcode').value = mode === 'edit' ? produk.barcode : '';
   el('produkMasterModalNama').value = mode === 'edit' ? produk.nama : '';
@@ -171,10 +164,6 @@ el('produkMasterModalSave').onclick = async () => {
   closeProdukMasterModal();
 };
 
-// Hapus produk dari master_produk sepenuhnya -- semua assignment ke sector
-// (produk_sectors) ikut kehapus (CASCADE). Kalau produk ini udah pernah
-// discan/kepake (ada di opname_entries/opname_final), Supabase bakal nolak
-// otomatis (FK constraint) biar data histori gak ilang.
 async function deleteProdukMaster(barcode){
   const produk = state.allMasterProduk.find(p => p.barcode === barcode);
   if(!produk) return;

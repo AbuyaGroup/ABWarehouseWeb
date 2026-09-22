@@ -1,6 +1,3 @@
-// =========================================================
-// MAIN MENU (abis login)
-// =========================================================
 function renderMainMenu(){
   el('userChip9').innerHTML = `<i class="ti ti-user-circle"></i> ${state.profile?.nama || state.session?.user?.email || 'User'} ${state.profile?.role === 'admin' ? '· Admin' : ''}`;
   el('menuMasterBtn').classList.toggle('hidden', state.profile?.role !== 'admin');
@@ -39,9 +36,6 @@ el('backFromSelectorBtn').onclick = () => {
   show('mainMenuScreen');
 };
 
-// =========================================================
-// DC SELECTOR (khusus Stock Opname)
-// =========================================================
 async function loadDcs(){
   const { data, error } = await sb.from('dcs').select('*').order('urutan');
   if(error){
@@ -80,8 +74,7 @@ function renderSelector(){
 el('backBtn').onclick = () => {
   if(state.realtimeChannel){ sb.removeChannel(state.realtimeChannel); state.realtimeChannel = null; }
   if(state.viewAllDc){
-    // Mode Semua Produk -- topbar-nya statis kaya di Pilih Zona, jadi
-    // perilaku tombol back-nya juga disamain: balik ke pilih Sesi.
+
     state.viewAllDc = false;
     el('switchViewBtn').classList.remove('is-all');
     hide('dashboardScreen');
@@ -106,10 +99,6 @@ el('backToSelectorFromSessionBtn').onclick = () => {
 el('logoutBtn3').onclick = () => forceLogout();
 el('logoutBtn4').onclick = () => forceLogout();
 
-// =========================================================
-// ZONA SELECTOR
-// =========================================================
-
 async function openDc(dcId){
   state.currentDc = state.dcs.find(d => d.id === dcId);
   state.currentZona = null;
@@ -127,9 +116,6 @@ async function openDc(dcId){
   renderSessionList();
 }
 
-// =========================================================
-// SESSION CRUD
-// =========================================================
 function renderSessionList(){
   if(!state.sessions.length){
     el('sessionListGrid').innerHTML = '';
@@ -161,8 +147,7 @@ function renderSessionList(){
       if(action === 'open') openSession(id);
       else if(action === 'rename') openSessionModal('edit', s);
       else if(action === 'toggle'){
-        // Sesi aktif -> mau ditandai selesai -> wajib lewat review qty final dulu.
-        // Sesi selesai -> mau diaktifin lagi -> langsung toggle, gak perlu review.
+
         if(s.status === 'aktif') openSessionReview(id);
         else toggleSessionStatus(id);
       }
@@ -174,9 +159,6 @@ function renderSessionList(){
 
 el('newSessionBtn').onclick = () => openSessionModal('create');
 
-// =========================================================
-// MODAL: CREATE / EDIT SESI
-// =========================================================
 function openSessionModal(mode, session){
   state.sessionModalMode = mode;
   state.sessionModalEditingId = session ? session.id : null;
@@ -247,9 +229,6 @@ el('sessionModalSave').onclick = async () => {
   }
 };
 
-// =========================================================
-// MODAL: HAPUS SESI
-// =========================================================
 function openDeleteModal(session){
   state.deletingSessionId = session.id;
   el('deleteModalText').textContent = `Hapus sesi "${session.nama}"? Semua data opname yang udah keisi di sesi ini bakal ikut kehapus dan gak bisa dibalikin lagi.`;
@@ -267,4 +246,3 @@ el('deleteModalCancel').onclick = closeDeleteModal;
 el('deleteModal').addEventListener('click', e => {
   if(e.target.id === 'deleteModal') closeDeleteModal();
 });
-

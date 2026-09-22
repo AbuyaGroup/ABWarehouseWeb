@@ -1,6 +1,3 @@
-// =========================================================
-// SESSION REVIEW -- revisi qty final sebelum sesi ditutup
-// =========================================================
 async function openSessionReview(sessionId){
   const session = state.sessions.find(x => x.id === sessionId);
   if(!session) return;
@@ -17,19 +14,12 @@ async function openSessionReview(sessionId){
   show('sessionReviewScreen');
 
   try {
-    // Entries hasil scan buat sesi ini, sekalian detail produk & sector-nya.
-    // sector_id sekarang ada langsung di opname_entries, jadi gak perlu lagi
-    // nebak sector lewat produk_sectors (satu barcode bisa ada di > 1 sector,
-    // makanya harus liat sector_id di entry-nya masing-masing).
+
     const { data: entriesData, error: entriesErr } = await sb
       .from('opname_entries')
       .select('id, barcode, sector_id, qty_fisik, master_produk(nama, satuan), sectors(nama), updated_at')
       .eq('session_id', sessionId)
-      // Diurutin ascending updated_at, bukan barcode -- soalnya kalau ada
-      // > 1 row buat barcode+sector yang sama (misal: scan ulang di waktu
-      // lain -- uploadEntries() di app insert row baru, bukan update yang
-      // lama), dedupe di bawah butuh row PALING BARU diproses terakhir
-      // biar itu yang menang overwrite.
+
       .order('updated_at', { ascending: true });
     if(entriesErr) throw entriesErr;
 
@@ -38,18 +28,11 @@ async function openSessionReview(sessionId){
       return;
     }
 
-    // Dedupe per barcode+sector -- kalau gak di-dedupe, barcode yang
-    // ke-scan ulang bakal muncul 2x di tabel review DAN ke-double-count pas
-    // ditulis ke opname_final waktu sesi dikonfirmasi selesai.
     const dedupedByKey = {};
     entriesData.forEach(e => {
       dedupedByKey[`${e.barcode}|${e.sector_id}`] = e;
     });
 
-    // Agregasi lanjut per barcode -- kalau produk yang sama ke-assign ke
-    // beberapa sector (misal ke-scan di A01 & A02), qty-nya DIJUMLAHIN jadi
-    // satu baris per produk. opname_final sendiri emang gak nyimpen sector_id,
-    // jadi lebih benar diagregasi dari sini (bukan nunggu pas export doang).
     const aggByBarcode = {};
     Object.values(dedupedByKey).forEach(e => {
       if(!aggByBarcode[e.barcode]){
@@ -141,16 +124,12 @@ el('confirmReviewBtn').onclick = async () => {
   btn.innerHTML = '<i class="ti ti-loader-2"></i> Menyimpan...';
 
   try {
-    // Baca ulang nilai Qty Final dari tiap input, biar dapet nilai paling baru
+
     el('reviewTableBody').querySelectorAll('.qty-final-input').forEach(input => {
       const idx = Number(input.getAttribute('data-idx'));
       state.reviewRows[idx].qtyFinal = input.value === '' ? 0 : Number(input.value);
     });
 
-    // Qty final (hasil review/revisi admin) disimpen ke opname_final --
-    // BUKAN nulis balik ke opname_entries, biar data mentah hasil scan
-    // (opname_entries) tetep utuh sebagai arsip, terpisah dari angka yang
-    // udah di-otorisasi admin.
     const payload = state.reviewRows.map(row => ({
       session_id: state.reviewSessionId,
       barcode: row.barcode,
@@ -161,7 +140,6 @@ el('confirmReviewBtn').onclick = async () => {
     const { error: insertErr } = await sb.from('opname_final').insert(payload);
     if(insertErr) throw insertErr;
 
-    // Tandai sesi selesai
     const { error: statusErr } = await sb
       .from('opname_sessions').update({ status: 'selesai' }).eq('id', state.reviewSessionId);
     if(statusErr) throw statusErr;
@@ -177,4 +155,3 @@ el('confirmReviewBtn').onclick = async () => {
     btn.innerHTML = originalLabel;
   }
 };
-

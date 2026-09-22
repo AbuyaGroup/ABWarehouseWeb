@@ -17,7 +17,6 @@
 </head>
 <body>
 
-<!-- ============ LOGIN ============ -->
 <div id="loginScreen">
   <div class="login-card">
     <div class="login-brand"><div class="mark"><i class="ti ti-building-warehouse"></i></div><span>Abuya Inventory</span></div>
@@ -35,8 +34,6 @@
   </div>
 </div>
 
-<!-- ============ DC SELECTOR ============ -->
-<!-- ============ MAIN MENU (abis login) ============ -->
 <div id="mainMenuScreen" class="hidden">
   <div class="topbar">
     <div class="brand"><div class="mark"><i class="ti ti-building-warehouse"></i></div>Abuya Inventory</div>
@@ -69,7 +66,6 @@
   </div>
 </div>
 
-<!-- ============ DC SELECTOR (khusus Stock Opname) ============ -->
 <div id="selectorScreen" class="hidden">
   <div class="topbar">
     <button class="back-btn" id="backFromSelectorBtn"><i class="ti ti-arrow-left"></i> Menu lain</button>
@@ -86,7 +82,6 @@
   </div>
 </div>
 
-<!-- ============ MASTER MENU (Produk vs DC) ============ -->
 <div id="masterMenuScreen" class="hidden">
   <div class="topbar">
     <button class="back-btn" id="backFromMasterMenuBtn"><i class="ti ti-arrow-left"></i> Menu lain</button>
@@ -120,7 +115,6 @@
   </div>
 </div>
 
-<!-- ============ MASTER: KELOLA PRODUK (global, gak nempel DC) ============ -->
 <div id="manageProdukMasterScreen" class="hidden">
   <div class="topbar">
     <button class="back-btn" id="backFromProdukMasterBtn"><i class="ti ti-arrow-left"></i> Menu lain</button>
@@ -176,7 +170,6 @@
   </div>
 </div>
 
-<!-- ============ MASTER: PILIH DC (admin, kelola data) ============ -->
 <div id="manageDcScreen" class="hidden">
   <div class="topbar">
     <button class="back-btn" id="backFromManageDcBtn"><i class="ti ti-arrow-left"></i> Master lain</button>
@@ -198,7 +191,6 @@
   </div>
 </div>
 
-<!-- ============ SESSION LIST (CRUD) ============ -->
 <div id="sessionListScreen" class="hidden">
   <div class="topbar">
     <button class="back-btn" id="backToSelectorFromSessionBtn"><i class="ti ti-arrow-left"></i> DC lain</button>
@@ -221,7 +213,6 @@
   </div>
 </div>
 
-<!-- ============ SESSION REVIEW (Konfirmasi Selesai) ============ -->
 <div id="sessionReviewScreen" class="hidden">
   <div class="topbar">
     <button class="back-btn" id="backFromReviewBtn"><i class="ti ti-arrow-left"></i> Batal</button>
@@ -257,7 +248,6 @@
   </div>
 </div>
 
-<!-- ============ ZONA SELECTOR ============ -->
 <div id="zonaScreen" class="hidden">
   <div class="topbar">
     <button class="back-btn" id="backToSelectorBtn"><i class="ti ti-arrow-left"></i> Sesi lain</button>
@@ -285,7 +275,6 @@
   </div>
 </div>
 
-<!-- ============ DASHBOARD ============ -->
 <div id="dashboardScreen" class="hidden">
   <div class="topbar">
     <button class="back-btn" id="backBtn"><i class="ti ti-arrow-left"></i> Zona lain</button>
@@ -359,7 +348,6 @@
   </div>
 </div>
 
-<!-- ============ MODAL: CREATE / EDIT SESI ============ -->
 <div id="sessionModal" class="modal-overlay hidden">
   <div class="modal-card">
     <h2 id="sessionModalTitle">Sesi Baru</h2>
@@ -378,7 +366,6 @@
   </div>
 </div>
 
-<!-- ============ MODAL: HAPUS SESI ============ -->
 <div id="deleteModal" class="modal-overlay hidden">
   <div class="modal-card">
     <h2>Hapus Sesi?</h2>
@@ -390,13 +377,11 @@
   </div>
 </div>
 
-<!-- ============ MODAL: EXPORT SESI ============ -->
 <div id="exportModal" class="modal-overlay hidden">
   <div class="modal-card">
     <h2>Export Sesi</h2>
     <p class="modal-desc" id="exportModalDesc" style="margin-bottom:16px;"></p>
 
-    <!-- Step 1: pilih jenis export -->
     <div id="exportOptionsStep">
       <button class="export-option" id="exportOptionPdf">
         <span class="ico"><i class="ti ti-file-type-pdf"></i></span>
@@ -417,7 +402,6 @@
       </div>
     </div>
 
-    <!-- Step 2: pilih Zona -> Sector, khusus buat Counting 1 (PDF) -->
     <div id="exportPdfStep" class="hidden">
       <div class="field">
         <label>Zona</label>
@@ -435,7 +419,6 @@
   </div>
 </div>
 
-<!-- ============ KELOLA DATA: PILIH ZONA (admin, lepas dari sesi) ============ -->
 <div id="manageZonaScreen" class="hidden">
   <div class="topbar">
     <button class="back-btn" id="backFromManageZonaBtn"><i class="ti ti-arrow-left"></i> DC lain</button>
@@ -458,7 +441,6 @@
   </div>
 </div>
 
-<!-- ============ KELOLA DATA: SECTOR & PRODUK (admin, lepas dari sesi) ============ -->
 <div id="manageProdukScreen" class="hidden">
   <div class="topbar">
     <button class="back-btn" id="backFromManageProdukBtn"><i class="ti ti-arrow-left"></i> Zona lain</button>
@@ -513,7 +495,6 @@
   </div>
 </div>
 
-<!-- ============ MODAL: DC BARU (admin) ============ -->
 <div id="dcModal" class="modal-overlay hidden">
   <div class="modal-card">
     <h2 id="dcModalTitle">DC Baru</h2>
@@ -540,7 +521,6 @@
   </div>
 </div>
 
-<!-- ============ MODAL: ZONA BARU (admin) ============ -->
 <div id="zoneModal" class="modal-overlay hidden">
   <div class="modal-card">
     <h2 id="zoneModalTitle">Zona Baru</h2>
@@ -559,7 +539,6 @@
   </div>
 </div>
 
-<!-- ============ MODAL: SECTOR BARU (admin) ============ -->
 <div id="sectorModal" class="modal-overlay hidden">
   <div class="modal-card">
     <h2 id="sectorModalTitle">Sector Baru</h2>
@@ -579,7 +558,6 @@
   </div>
 </div>
 
-<!-- ============ MODAL: PRODUK BARU (admin) ============ -->
 <div id="produkModal" class="modal-overlay hidden">
   <div class="modal-card">
     <h2>Assign Produk ke Sector</h2>
@@ -604,7 +582,6 @@
   </div>
 </div>
 
-<!-- ============ MODAL: PRODUK BARU / EDIT PRODUK (Master, global) ============ -->
 <div id="produkMasterModal" class="modal-overlay hidden">
   <div class="modal-card">
     <h2 id="produkMasterModalTitle">Produk Baru</h2>

@@ -1,9 +1,3 @@
-// =========================================================
-// MODAL: EXPORT SESI
-// =========================================================
-// Sesi AKTIF -> cuma boleh export Counting 1 (PDF), soalnya opname_final
-// baru keisi setelah sesi dikonfirmasi selesai lewat halaman review.
-// Sesi SELESAI -> boleh export dua-duanya.
 function openExportModal(session){
   state.exportingSession = session;
   const isSelesai = session.status === 'selesai';
@@ -40,9 +34,6 @@ el('exportModal').addEventListener('click', e => {
   if(e.target.id === 'exportModal') closeExportModal();
 });
 
-// Counting 1 (PDF) sekarang minta pilih Zona dulu, baru Sector, sebelum
-// PDF-nya digenerate -- soalnya satu DC bisa punya banyak zona/sector dan
-// biasanya yang mau dicetak cuma satu sector aja per print.
 el('exportOptionPdf').onclick = async () => {
   if(!state.exportingSession) return;
   const dcId = state.exportingSession.dc_id;
@@ -75,7 +66,6 @@ el('exportZonaSelect').addEventListener('change', (e) => {
   loadSectorOptionsForExport(e.target.value);
 });
 
-// Isi dropdown Sector berdasarkan Zona yang lagi dipilih di step PDF.
 async function loadSectorOptionsForExport(zonaId){
   const sectorSelect = el('exportSectorSelect');
   if(!zonaId){
@@ -132,10 +122,6 @@ const THIN_BORDER = {
   right: { style: 'thin', color: { argb: 'FFD8DEE9' } },
 };
 
-// SO Template (Excel) -- sumbernya opname_final (qty yang UDAH diotorisasi
-// admin lewat halaman review), bukan opname_entries. Makanya cuma tersedia
-// buat sesi yang statusnya udah 'selesai' (karena opname_final baru keisi
-// pas admin confirm di halaman review).
 async function exportSoTemplateXlsx(session){
   try {
     const { data: finalData, error: finalErr } = await sb
@@ -150,16 +136,9 @@ async function exportSoTemplateXlsx(session){
       return;
     }
 
-    // Kalau sesi ini pernah di-confirm lebih dari sekali, cuma ambil batch
-    // confirm yang PALING BARU (semua baris dari 1x confirm punya
-    // authorized_at yang sama persis, karena di-insert dalam 1 request/
-    // transaksi). Batch lama dibuang biar gak dobel/basi.
     const latestAuthorizedAt = finalData[0].authorized_at;
     const latestBatch = finalData.filter(row => row.authorized_at === latestAuthorizedAt);
 
-    // Satu barcode bisa punya lebih dari 1 baris di batch itu (kehitung di
-    // beberapa sector sekaligus -- opname_final sendiri gak nyimpen sector_id),
-    // jadi qty_final-nya dijumlahin per barcode buat dapet total per produk.
     const totalsByBarcode = {};
     latestBatch.forEach(row => {
       if(!totalsByBarcode[row.barcode]){
@@ -188,7 +167,7 @@ async function exportSoTemplateXlsx(session){
     titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
     sheet.getRow(1).height = 24;
 
-    sheet.addRow([]); // baris kosong pemisah (row 2)
+    sheet.addRow([]);
 
     const headerRow = sheet.addRow(header);
     headerRow.eachCell(cell => {
@@ -203,7 +182,7 @@ async function exportSoTemplateXlsx(session){
     rows.forEach(row => {
       const p = row.master_produk || {};
       const qty = row.qty_final ?? 0;
-      const value = 0; // belum ada data harga per produk, defaultnya 0 (bukan kosong)
+      const value = 0;
 
       const r = sheet.addRow([no, p.nama || '(produk tak dikenal)', p.kode_produk || '', p.kategori || '', p.sub_kategori || '', p.satuan || '', qty, value]);
       r.eachCell((cell, colNumber) => {
@@ -239,10 +218,6 @@ el('deleteModalConfirm').onclick = async () => {
   el('deleteModalConfirm').disabled = true;
   el('deleteModalConfirm').textContent = 'Menghapus...';
 
-  // .select() dipakai di sini bukan buat datanya, tapi biar kita bisa tau
-  // beneran ke-delete apa nggak. Supabase RLS itu KHUSUS: kalau policy DELETE
-  // nge-block, gak ada error yang balik -- row-nya cuma "difilter" diem-diem
-  // dan hasilnya keliatan "sukses" padahal 0 baris yang kehapus.
   const { data: entriesData, error: entriesErr } = await sb
     .from('opname_entries').delete().eq('session_id', id).select();
   if(entriesErr){
@@ -264,8 +239,7 @@ el('deleteModalConfirm').onclick = async () => {
   }
 
   if(!sessionData || sessionData.length === 0){
-    // Ini kasus RLS-nya diem-diem block: gak ada error, tapi juga gak ada
-    // baris yang kehapus.
+
     console.warn('Delete returned 0 rows -- kemungkinan besar RLS policy DELETE di opname_sessions gak ngizinin role ini.');
     alert('Sesi gak berhasil kehapus. Kemungkinan besar akun ini gak punya izin (RLS policy) buat hapus data di tabel opname_sessions. Cek policy DELETE di Supabase dashboard buat tabel opname_sessions & opname_entries.');
     el('deleteModalConfirm').disabled = false;
@@ -290,4 +264,3 @@ async function toggleSessionStatus(id){
   await loadSessions(state.currentDc.id);
   renderSessionList();
 }
-
