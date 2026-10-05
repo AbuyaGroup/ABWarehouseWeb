@@ -70,7 +70,7 @@ const Store = Vue.reactive({
 const SUPABASE_URL = window.APP_CONFIG?.SUPABASE_URL;
 const SUPABASE_ANON_KEY = window.APP_CONFIG?.SUPABASE_ANON_KEY;
 if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-  throw new Error('Missing APP_CONFIG. Copy js/config.example.js to js/config.js and fill in your Supabase credentials.');
+  throw new Error('Missing APP_CONFIG. Create js/config.js with window.APP_CONFIG = { SUPABASE_URL, SUPABASE_ANON_KEY }.');
 }
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: { persistSession: true, storage: window.sessionStorage },
