@@ -1215,6 +1215,17 @@
   .home-panel-empty{ margin:0; padding:26px 10px; text-align:center; color:var(--muted); font-size:13px; }
 
   .home-zone-list{ display:flex; flex-direction:column; gap:4px; }
+  .home-scroll{
+    max-height:320px; overflow-y:auto; overscroll-behavior:contain; margin-right:-6px; padding-right:6px;
+    scrollbar-width:thin; scrollbar-color:#cdd6ea transparent;
+    -webkit-mask-image:linear-gradient(to bottom, #000 calc(100% - 18px), transparent);
+    mask-image:linear-gradient(to bottom, #000 calc(100% - 18px), transparent);
+  }
+  .home-scroll.at-end{ -webkit-mask-image:none; mask-image:none; }
+  .home-scroll::-webkit-scrollbar{ width:6px; }
+  .home-scroll::-webkit-scrollbar-track{ background:transparent; }
+  .home-scroll::-webkit-scrollbar-thumb{ background:#cdd6ea; border-radius:10px; }
+  .home-scroll::-webkit-scrollbar-thumb:hover{ background:#aebbd8; }
   .home-zone{
     display:flex; flex-direction:column; gap:8px; width:100%; padding:11px 10px; border:none; border-radius:12px;
     background:transparent; text-align:left; cursor:pointer; font-family:'Inter',sans-serif;
@@ -1270,6 +1281,7 @@
     .home-kpi{ padding:14px; grid-template-columns:1fr; }
     .home-kpi-icon{ grid-row:auto; width:32px; height:32px; font-size:16px; margin-bottom:8px; }
     .home-kpi-value{ font-size:22px; }
+    .home-scroll{ max-height:280px; }
   }
   @media (prefers-reduced-motion:reduce){
     .home-live-dot, .home-skeleton{ animation:none; }

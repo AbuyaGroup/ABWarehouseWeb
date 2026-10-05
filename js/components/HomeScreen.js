@@ -10,6 +10,7 @@ const HomeScreen = {
       now: Date.now(),
       clockTimer: null,
       opening: false,
+      scrollEnd: { zones: false, activity: false },
     };
   },
   computed: {
@@ -49,6 +50,7 @@ const HomeScreen = {
       if (error) { this.errorText = error; if (!silent) toast(error); return; }
       this.errorText = '';
       this.home = data;
+      this.refreshScrollEnd();
       this.subscribe();
     },
     subscribe() {
@@ -67,6 +69,17 @@ const HomeScreen = {
     scheduleReload() {
       clearTimeout(this.reloadTimer);
       this.reloadTimer = setTimeout(() => this.load(true), 1500);
+    },
+    onScroll(key, e) { this.updateScrollEnd(key, e.target); },
+    updateScrollEnd(key, el) {
+      if (!el) return;
+      this.scrollEnd[key] = el.scrollTop + el.clientHeight >= el.scrollHeight - 4;
+    },
+    refreshScrollEnd() {
+      this.$nextTick(() => {
+        this.updateScrollEnd('zones', this.$refs.zonesScroll);
+        this.updateScrollEnd('activity', this.$refs.activityScroll);
+      });
     },
     zonePct(z) { return z.total ? Math.round((z.checked / z.total) * 100) : 0; },
     zoneState(z) {
@@ -190,7 +203,7 @@ const HomeScreen = {
                 <h3>Progres per zona</h3>
                 <span class="home-panel-count">{{ zones.length }} zona</span>
               </div>
-              <div v-if="zones.length" class="home-zone-list">
+              <div v-if="zones.length" class="home-zone-list home-scroll" :class="{ 'at-end': scrollEnd.zones }" ref="zonesScroll" @scroll="onScroll('zones', $event)">
                 <button v-for="z in zones" :key="z.id" type="button" class="home-zone" :class="'is-' + zoneState(z)" :disabled="opening || !z.total" @click="continueSession(z)">
                   <div class="home-zone-top">
                     <span class="home-zone-name">{{ z.nama }}</span>
@@ -210,7 +223,7 @@ const HomeScreen = {
                 <h3>Aktivitas terakhir saya</h3>
                 <span class="home-panel-count">sesi ini</span>
               </div>
-              <ul v-if="activity.length" class="home-activity">
+              <ul v-if="activity.length" class="home-activity home-scroll" :class="{ 'at-end': scrollEnd.activity }" ref="activityScroll" @scroll="onScroll('activity', $event)">
                 <li v-for="a in activity" :key="a.id">
                   <div class="home-activity-main">
                     <span class="home-activity-name">{{ a.master_produk?.nama || a.barcode }}</span>
