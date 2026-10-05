@@ -51,7 +51,7 @@ const AppSidebar = {
     <div v-if="store.currentScreen !== 'login'" :class="['sidebar', { 'sidebar-open': store.sidebarOpen, 'sidebar-collapsed': store.sidebarCollapsed }]">
       <div class="sidebar-brand">
         <button type="button" class="mark" @click="toggleDesktopCollapse" title="Buka/tutup sidebar"><i class="ti ti-building-warehouse"></i></button>
-        <span class="sidebar-label">Abuya Inventory</span>
+        <span class="sidebar-label">ABWarehouse</span>
         <button type="button" class="sidebar-close" @click="closeMobile"><i class="ti ti-x"></i></button>
       </div>
       <ul class="sidebar-menu">
