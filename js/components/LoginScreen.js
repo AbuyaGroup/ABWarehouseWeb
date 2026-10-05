@@ -27,7 +27,7 @@ const LoginScreen = {
         <div class="login-visual-shape shape-1"></div>
         <div class="login-visual-shape shape-2"></div>
         <div class="login-visual-content">
-          <div class="login-visual-brand"><div class="mark"><i class="ti ti-building-warehouse"></i></div><span>HAASIR</span></div>
+          <div class="login-visual-brand"><div class="mark"><i class="ti ti-building-warehouse"></i></div><span>ABWarehouse</span></div>
           <h1 class="login-visual-headline">Tanggal 29 SO? Pakai ini aja dulu mas bro!</h1>
           <p class="login-visual-sub">Yang menghitung, merekap, dan menginventarisasi</p>
           <ul class="login-visual-points">
@@ -39,7 +39,7 @@ const LoginScreen = {
       </div>
       <div class="login-form-panel">
         <div class="login-card">
-          <div class="login-brand login-brand-mobile"><div class="mark"><i class="ti ti-building-warehouse"></i></div><span>Abuya Inventory</span></div>
+          <div class="login-brand login-brand-mobile"><div class="mark"><i class="ti ti-building-warehouse"></i></div><span>ABWarehouse</span></div>
           <div class="login-brand"><div class="mark"><i class="ti ti-building-warehouse"></i></div><span>Masuk</span></div>
           <p class="sub">Inventory</p>
           <div :class="['login-error', { show: errorMsg }]">{{ errorMsg }}</div>

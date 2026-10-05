@@ -14,7 +14,16 @@ const SessionListScreen = {
       exportZonas: [],
       exportSectors: [],
       exportingPdf: false,
+      menuOpenId: null,
     };
+  },
+  mounted() {
+    document.addEventListener('click', this.handleDocClick);
+    document.addEventListener('keydown', this.handleKeydown);
+  },
+  beforeUnmount() {
+    document.removeEventListener('click', this.handleDocClick);
+    document.removeEventListener('keydown', this.handleKeydown);
   },
   watch: {
     'store.sessionModalMode'(v) { v ? lockScroll() : unlockScroll(); },
@@ -30,6 +39,18 @@ const SessionListScreen = {
   methods: {
     formatTanggal,
     statusLabel(s) { return s === 'aktif' ? 'Tandai selesai' : 'Aktifkan lagi'; },
+
+    toggleMenu(id) { this.menuOpenId = this.menuOpenId === id ? null : id; },
+    closeMenu() { this.menuOpenId = null; },
+    handleDocClick(e) {
+      if (this.menuOpenId === null) return;
+      if (!e.target.closest('.session-menu')) this.closeMenu();
+    },
+    handleKeydown(e) { if (e.key === 'Escape') this.closeMenu(); },
+    runMenuAction(action, s) {
+      this.closeMenu();
+      action(s);
+    },
 
     openNewSessionModal() { this.openSessionModal('create'); },
     openEditSessionModal(s) { this.openSessionModal('edit', s); },
@@ -139,17 +160,25 @@ const SessionListScreen = {
           <button class="btn-amber" @click="openNewSessionModal"><i class="ti ti-plus"></i> Sesi Baru</button>
         </div>
         <div class="session-list">
-          <div v-for="s in store.sessions" :key="s.id" class="session-card">
+          <div v-for="s in store.sessions" :key="s.id" class="session-card" :class="{ 'menu-open': menuOpenId === s.id }">
             <div class="info">
               <div class="nama">{{ s.nama }}</div>
               <div class="meta"><span>{{ formatTanggal(s.tanggal) }}</span><span :class="['status-badge', s.status]">{{ s.status }}</span></div>
             </div>
             <div class="actions">
-              <button class="btn-icon" title="Export" @click="openExport(s)"><i class="ti ti-download"></i></button>
-              <button class="btn-icon" title="Edit sesi" @click="openEditSessionModal(s)"><i class="ti ti-edit"></i></button>
-              <button class="btn-icon" :title="statusLabel(s.status)" @click="toggleStatus(s)"><i class="ti" :class="s.status === 'aktif' ? 'ti-check' : 'ti-refresh'"></i></button>
-              <button class="btn-icon danger" title="Hapus sesi" @click="openDeleteModal(s)"><i class="ti ti-trash"></i></button>
               <button class="btn-amber" @click="openSession(s.id)">Buka</button>
+              <div class="session-menu">
+                <button class="btn-icon" :class="{ active: menuOpenId === s.id }" title="Aksi lainnya" @click="toggleMenu(s.id)"><i class="ti ti-dots-vertical"></i></button>
+                <Transition name="pop">
+                  <div v-if="menuOpenId === s.id" class="session-menu-popover">
+                    <button class="session-menu-item" @click="runMenuAction(openExport, s)"><i class="ti ti-download"></i> Export</button>
+                    <button class="session-menu-item" @click="runMenuAction(openEditSessionModal, s)"><i class="ti ti-edit"></i> Edit sesi</button>
+                    <button class="session-menu-item" @click="runMenuAction(toggleStatus, s)"><i class="ti" :class="s.status === 'aktif' ? 'ti-check' : 'ti-refresh'"></i> {{ statusLabel(s.status) }}</button>
+                    <div class="session-menu-divider"></div>
+                    <button class="session-menu-item danger" @click="runMenuAction(openDeleteModal, s)"><i class="ti ti-trash"></i> Hapus</button>
+                  </div>
+                </Transition>
+              </div>
             </div>
           </div>
         </div>

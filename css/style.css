@@ -1003,6 +1003,27 @@
   .fancy-select-option.active{ background:var(--primary-soft); color:var(--primary); font-weight:600; }
   .fancy-select-empty{ padding:16px; text-align:center; color:var(--muted); font-size:12.5px; }
 
+  .session-card.menu-open{ position:relative; z-index:20; }
+  .session-menu{ position:relative; }
+  .session-menu .btn-icon.active{ border-color:var(--primary); background:var(--primary-soft); color:var(--primary); }
+  .session-menu-popover{
+    position:absolute; top:calc(100% + 6px); right:0; z-index:60; min-width:180px; padding:5px;
+    background:var(--surface-1); border:1px solid var(--border); border-radius:12px; box-shadow:var(--shadow);
+    transform-origin:top right;
+  }
+  .session-menu-item{
+    display:flex; align-items:center; gap:9px; width:100%; padding:8px 10px; border:none; border-radius:8px;
+    background:transparent; color:var(--ink); font-family:'Inter',sans-serif; font-size:13px; font-weight:500;
+    text-align:left; cursor:pointer; white-space:nowrap;
+  }
+  .session-menu-item i{ font-size:15px; color:var(--muted); flex-shrink:0; }
+  .session-menu-item:hover{ background:var(--primary-soft); color:var(--primary); }
+  .session-menu-item:hover i{ color:var(--primary); }
+  .session-menu-item.danger{ color:var(--danger); }
+  .session-menu-item.danger i{ color:var(--danger); }
+  .session-menu-item.danger:hover{ background:var(--danger-soft); color:var(--danger); }
+  .session-menu-divider{ height:1px; background:var(--border); margin:4px 2px; }
+
   .date-picker-popover{ left:0; right:auto; width:216px; min-width:0; padding:8px 9px 6px; }
   .date-picker-header{ display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; }
   .date-picker-month{ font-size:11.5px; font-weight:700; color:var(--ink); text-transform:capitalize; }
