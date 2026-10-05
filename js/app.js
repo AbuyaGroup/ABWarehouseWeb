@@ -1,5 +1,6 @@
 const SCREEN_COMPONENTS = {
   login: LoginScreen,
+  home: HomeScreen,
   selector: SelectorScreen,
   sessionList: SessionListScreen,
   sessionReview: SessionReviewScreen,

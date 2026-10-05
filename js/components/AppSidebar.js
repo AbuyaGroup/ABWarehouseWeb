@@ -11,6 +11,7 @@ const AppSidebar = {
     },
     activeGroup() {
       const s = this.store.currentScreen;
+      if (s === 'home') return 'home';
       if (['selector', 'sessionList', 'sessionReview', 'zona', 'dashboard'].includes(s)) return 'opname';
       if (['manageDc', 'manageZona', 'manageProduk', 'produkMaster'].includes(s)) return 'master';
       return null;
@@ -41,6 +42,7 @@ const AppSidebar = {
       if (this.store.sidebarCollapsed) { toggleSidebarCollapse(); this.masterMenuOpen = true; return; }
       this.masterMenuOpen = !this.masterMenuOpen;
     },
+    openHome() { goHome(); },
     openProdukMaster() { goToScreen('produkMaster'); },
     openManageDc() { goToScreen('manageDc'); },
     logout() { forceLogout(); },
@@ -55,6 +57,9 @@ const AppSidebar = {
         <button type="button" class="sidebar-close" @click="closeMobile"><i class="ti ti-x"></i></button>
       </div>
       <ul class="sidebar-menu">
+        <li v-if="!isAdmin">
+          <a :class="{ active: activeGroup === 'home' }" title="Home" @click="openHome"><i class="ti ti-home"></i> <span class="sidebar-label">Home</span></a>
+        </li>
         <li class="sidebar-group" :class="{ open: opnameMenuOpen }">
           <a class="sidebar-group-toggle" :class="{ active: activeGroup === 'opname' }" @click="toggleOpnameMenu">
             <i class="ti ti-clipboard-list"></i> <span class="sidebar-label">Stock Opname</span>

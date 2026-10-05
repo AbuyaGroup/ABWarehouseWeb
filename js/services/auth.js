@@ -59,6 +59,6 @@ async function afterLogin() {
   await claimSession();
   watchSessionKick();
   await loadDcs();
-  Store.currentScreen = 'selector';
+  Store.currentScreen = Store.profile?.role === 'admin' ? 'selector' : 'home';
   return { error: null };
 }
