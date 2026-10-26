@@ -1,5 +1,5 @@
 const ProdukMasterScreen = {
-  components: { PaginationBar },
+  components: { PaginationBar, BulkActionBar },
   data() {
     return {
       store: Store,
@@ -16,6 +16,9 @@ const ProdukMasterScreen = {
       formSubKategori: '',
       formSatuan: '',
       saving: false,
+      selected: new Set(),
+      bulkBusy: false,
+      bulkBusyText: 'Mengecek...',
     };
   },
   watch: {
@@ -46,11 +49,52 @@ const ProdukMasterScreen = {
       if (page < 1) page = 1;
       return this.filtered.slice((page - 1) * 10, page * 10);
     },
+    pageAllSelected() { return this.pageItems.length > 0 && this.pageItems.every(p => this.selected.has(p.barcode)); },
+    pageSomeSelected() { return !this.pageAllSelected && this.pageItems.some(p => this.selected.has(p.barcode)); },
+    allFilteredSelected() { return this.filtered.length > 0 && this.filtered.every(p => this.selected.has(p.barcode)); },
+    showSelectAllHint() { return this.pageAllSelected && this.filtered.length > this.pageItems.length; },
   },
   methods: {
     onSearchInput() {
       Store.produkMasterSearchQuery = this.searchInput.trim().toLowerCase();
       Store.produkMasterPage = 1;
+      this.clearSelection();
+    },
+    isSelected(p) { return this.selected.has(p.barcode); },
+    toggleOne(p) { this.selected.has(p.barcode) ? this.selected.delete(p.barcode) : this.selected.add(p.barcode); },
+    togglePage() {
+      if (this.pageAllSelected) this.pageItems.forEach(p => this.selected.delete(p.barcode));
+      else this.pageItems.forEach(p => this.selected.add(p.barcode));
+    },
+    selectAllFiltered() { this.filtered.forEach(p => this.selected.add(p.barcode)); },
+    clearSelection() { this.selected.clear(); },
+    async bulkDelete() {
+      const barcodes = [...this.selected];
+      if (!barcodes.length || this.bulkBusy) return;
+      this.bulkBusy = true;
+      this.bulkBusyText = 'Mengecek...';
+      const check = await prepareBulkDeleteProduk(barcodes);
+      if (check.error) { this.bulkBusy = false; toast(check.error); return; }
+      const { deletable, skipped } = check;
+      if (!deletable.length) {
+        this.bulkBusy = false;
+        toast(`Semua ${skipped.length} produk yang dipilih sudah pernah dipakai di sesi opname, jadi nggak bisa dihapus.`, 'warn', 6000);
+        return;
+      }
+      const skipNote = skipped.length ? `\n\n${skipped.length} produk dilewati karena sudah pernah dipakai di sesi opname.` : '';
+      const ok = await confirmDialog({
+        title: `Hapus ${deletable.length} produk?`,
+        message: `${deletable.length} produk bakal dihapus dari Master Produk, termasuk penempatannya di semua sector.${skipNote}\n\nTindakan ini nggak bisa dibatalkan.`,
+        confirmText: `Hapus ${deletable.length}`, danger: true,
+      });
+      if (!ok) { this.bulkBusy = false; return; }
+      this.bulkBusyText = 'Menghapus...';
+      const { deleted, error } = await bulkDeleteMasterProduk(deletable);
+      this.bulkBusy = false;
+      this.clearSelection();
+      if (error) { toast(`Berhenti setelah ${deleted} produk terhapus. ${error}`, 'error', 7000); return; }
+      if (deleted < deletable.length) { toast(`Cuma ${deleted} dari ${deletable.length} produk yang terhapus. Cek izin hapus (RLS) di tabel master_produk.`, 'warn', 7000); return; }
+      toast(`${deleted} produk dihapus${skipped.length ? `, ${skipped.length} dilewati` : ''}.`, 'success');
     },
     goToPage(n) { Store.produkMasterPage = n; },
 
@@ -118,11 +162,17 @@ const ProdukMasterScreen = {
           <div class="table-scroll">
           <table class="produk-table">
             <colgroup>
-              <col style="width:14%"><col style="width:28%"><col style="width:18%">
-              <col style="width:17%"><col style="width:12%"><col style="width:11%">
+              <col style="width:48px"><col style="width:13%"><col style="width:27%"><col style="width:18%">
+              <col style="width:16%"><col style="width:11%"><col style="width:11%">
             </colgroup>
             <thead>
               <tr>
+                <th class="check-col">
+                  <label class="data-check data-check-plain" title="Pilih semua di halaman ini">
+                    <input type="checkbox" :checked="pageAllSelected" :indeterminate.prop="pageSomeSelected" :disabled="!pageItems.length" @change="togglePage">
+                    <span class="data-check-box"><i class="ti ti-check"></i></span>
+                  </label>
+                </th>
                 <th>Kategori</th>
                 <th>Produk</th>
                 <th>Barcode</th>
@@ -132,8 +182,20 @@ const ProdukMasterScreen = {
               </tr>
             </thead>
             <tbody>
-              <tr v-if="!filtered.length"><td colspan="6" class="empty-state">Gak ada produk yang cocok.</td></tr>
-              <tr v-for="p in pageItems" :key="p.barcode">
+              <tr v-if="showSelectAllHint" class="select-all-row">
+                <td colspan="7">
+                  <template v-if="!allFilteredSelected">Semua {{ pageItems.length }} produk di halaman ini dipilih. <button type="button" class="data-link" @click="selectAllFiltered">Pilih semua {{ filtered.length }} produk</button></template>
+                  <template v-else>Semua {{ filtered.length }} produk dipilih. <button type="button" class="data-link" @click="clearSelection">Batal pilih</button></template>
+                </td>
+              </tr>
+              <tr v-if="!filtered.length"><td colspan="7" class="empty-state">Gak ada produk yang cocok.</td></tr>
+              <tr v-for="p in pageItems" :key="p.barcode" :class="{ 'row-selected': isSelected(p) }">
+                <td class="check-col">
+                  <label class="data-check data-check-plain">
+                    <input type="checkbox" :checked="isSelected(p)" @change="toggleOne(p)">
+                    <span class="data-check-box"><i class="ti ti-check"></i></span>
+                  </label>
+                </td>
                 <td><span class="kategori-tag">{{ p.kategori || '-' }}</span></td>
                 <td class="produk-nama">{{ p.nama }}</td>
                 <td>{{ p.barcode }}</td>
@@ -154,7 +216,7 @@ const ProdukMasterScreen = {
           <table class="produk-table">
             <tbody>
               <tr v-for="n in 6" :key="n" class="skeleton-row">
-                <td><div class="skel-bar"></div></td><td><div class="skel-bar"></div></td><td><div class="skel-bar"></div></td>
+                <td class="check-col"></td><td><div class="skel-bar"></div></td><td><div class="skel-bar"></div></td><td><div class="skel-bar"></div></td>
                 <td><div class="skel-bar"></div></td><td><div class="skel-bar"></div></td><td><div class="skel-bar"></div></td>
               </tr>
             </tbody>
@@ -163,6 +225,8 @@ const ProdukMasterScreen = {
         </div>
         <div v-else class="empty-state"><p>Belum ada produk yang terdaftar.</p></div>
       </div>
+
+      <BulkActionBar :count="selected.size" noun="produk" :action-text="'Hapus ' + selected.size" :busy="bulkBusy" :busy-text="bulkBusyText" @clear="clearSelection" @action="bulkDelete" />
 
     <Transition name="modal-pop">
       <div v-if="modalOpen" class="modal-overlay" @click.self="closeModal">

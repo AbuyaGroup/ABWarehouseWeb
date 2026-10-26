@@ -1,6 +1,6 @@
 const AppSidebar = {
   data() {
-    return { store: Store, masterMenuOpen: false, opnameMenuOpen: false };
+    return { store: Store, masterMenuOpen: false, opnameMenuOpen: false, dataMenuOpen: false };
   },
   computed: {
     isAdmin() { return this.store.profile?.role === 'admin'; },
@@ -14,6 +14,7 @@ const AppSidebar = {
       if (s === 'home') return 'home';
       if (['selector', 'sessionList', 'sessionReview', 'zona', 'dashboard'].includes(s)) return 'opname';
       if (['manageDc', 'manageZona', 'manageProduk', 'produkMaster'].includes(s)) return 'master';
+      if (['dataExport', 'dataImport'].includes(s)) return 'data';
       return null;
     },
   },
@@ -21,6 +22,7 @@ const AppSidebar = {
     activeGroup(val) {
       if (val === 'master') this.masterMenuOpen = true;
       if (val === 'opname') this.opnameMenuOpen = true;
+      if (val === 'data') this.dataMenuOpen = true;
     },
     'store.sidebarCollapsed'(val) {
       document.body.classList.toggle('sidebar-collapsed', val);
@@ -43,6 +45,12 @@ const AppSidebar = {
       this.masterMenuOpen = !this.masterMenuOpen;
     },
     openHome() { goHome(); },
+    toggleDataMenu() {
+      if (this.store.sidebarCollapsed) { toggleSidebarCollapse(); this.dataMenuOpen = true; return; }
+      this.dataMenuOpen = !this.dataMenuOpen;
+    },
+    openDataExport() { goToScreen('dataExport'); },
+    openDataImport() { goToScreen('dataImport'); },
     openProdukMaster() { goToScreen('produkMaster'); },
     openManageDc() { goToScreen('manageDc'); },
     logout() { forceLogout(); },
@@ -53,7 +61,7 @@ const AppSidebar = {
     <div v-if="store.currentScreen !== 'login'" :class="['sidebar', { 'sidebar-open': store.sidebarOpen, 'sidebar-collapsed': store.sidebarCollapsed }]">
       <div class="sidebar-brand">
         <button type="button" class="mark" @click="toggleDesktopCollapse" title="Buka/tutup sidebar"><i class="ti ti-building-warehouse"></i></button>
-        <span class="sidebar-label">ABWarehouse</span>
+        <span class="sidebar-label">Abuya Inventory</span>
         <button type="button" class="sidebar-close" @click="closeMobile"><i class="ti ti-x"></i></button>
       </div>
       <ul class="sidebar-menu">
@@ -84,6 +92,18 @@ const AppSidebar = {
             <ul v-if="masterMenuOpen" class="sidebar-submenu">
               <li><a :class="{ active: store.currentScreen === 'produkMaster' }" @click="openProdukMaster"><i class="ti ti-package"></i> Produk</a></li>
               <li><a :class="{ active: ['manageDc', 'manageZona', 'manageProduk'].includes(store.currentScreen) }" @click="openManageDc"><i class="ti ti-building-warehouse"></i> DC</a></li>
+            </ul>
+          </Transition>
+        </li>
+        <li v-if="isAdmin" class="sidebar-group" :class="{ open: dataMenuOpen }">
+          <a class="sidebar-group-toggle" :class="{ active: activeGroup === 'data' }" @click="toggleDataMenu">
+            <i class="ti ti-database-share"></i> <span class="sidebar-label">Data</span>
+            <i class="ti ti-chevron-down sidebar-group-caret"></i>
+          </a>
+          <Transition name="sidebar-collapse">
+            <ul v-if="dataMenuOpen" class="sidebar-submenu">
+              <li><a :class="{ active: store.currentScreen === 'dataExport' }" @click="openDataExport"><i class="ti ti-file-export"></i> Export</a></li>
+              <li><a :class="{ active: store.currentScreen === 'dataImport' }" @click="openDataImport"><i class="ti ti-file-import"></i> Import</a></li>
             </ul>
           </Transition>
         </li>

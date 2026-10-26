@@ -39,7 +39,6 @@ const LoginScreen = {
       </div>
       <div class="login-form-panel">
         <div class="login-card">
-          <div class="login-brand login-brand-mobile"><div class="mark"><i class="ti ti-building-warehouse"></i></div><span>ABWarehouse</span></div>
           <div class="login-brand"><div class="mark"><i class="ti ti-building-warehouse"></i></div><span>Masuk</span></div>
           <p class="sub">Inventory</p>
           <div :class="['login-error', { show: errorMsg }]">{{ errorMsg }}</div>

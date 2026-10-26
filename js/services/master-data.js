@@ -100,3 +100,53 @@ async function deleteProdukMaster(barcode) {
   await loadAndSetAllMasterProduk();
   return { error: null };
 }
+
+const BULK_DELETE_CHUNK = 200;
+
+async function findUsedValues(field, values) {
+  const used = new Set();
+  if (!values.length) return { used, error: null };
+  for (const table of ['opname_entries', 'opname_final']) {
+    if (field === 'sector_id' && table === 'opname_final') continue;
+    const { data, error } = await fetchIn(table, field, field, values);
+    if (error) return { used, error };
+    data.forEach(r => used.add(String(r[field])));
+  }
+  return { used, error: null };
+}
+
+async function bulkDeleteRows(table, field, values) {
+  let deleted = 0;
+  for (const part of chunk(values, BULK_DELETE_CHUNK)) {
+    const { data, error } = await sb.from(table).delete().in(field, part).select(field);
+    if (error) return { deleted, error: error.message };
+    deleted += (data || []).length;
+  }
+  return { deleted, error: null };
+}
+
+async function prepareBulkDeleteProduk(barcodes) {
+  const { used, error } = await findUsedValues('barcode', barcodes);
+  if (error) return { error: 'Gagal cek riwayat opname: ' + error.message };
+  return { deletable: barcodes.filter(b => !used.has(String(b))), skipped: barcodes.filter(b => used.has(String(b))), error: null };
+}
+
+async function bulkDeleteMasterProduk(barcodes) {
+  const res = await bulkDeleteRows('master_produk', 'barcode', barcodes);
+  await loadAndSetAllMasterProduk();
+  return res;
+}
+
+async function prepareBulkDeleteSectors(sectorIds) {
+  const { used, error } = await findUsedValues('sector_id', sectorIds);
+  if (error) return { error: 'Gagal cek riwayat opname: ' + error.message };
+  return { deletable: sectorIds.filter(id => !used.has(String(id))), skipped: sectorIds.filter(id => used.has(String(id))), error: null };
+}
+
+async function bulkDeleteSectors(sectorIds) {
+  return bulkDeleteRows('sectors', 'id', sectorIds);
+}
+
+async function bulkDeleteProdukSectors(psIds) {
+  return bulkDeleteRows('produk_sectors', 'id', psIds);
+}

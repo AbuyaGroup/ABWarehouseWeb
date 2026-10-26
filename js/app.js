@@ -10,6 +10,8 @@ const SCREEN_COMPONENTS = {
   manageZona: ManageZonaScreen,
   manageProduk: ManageProdukScreen,
   produkMaster: ProdukMasterScreen,
+  dataExport: DataExportScreen,
+  dataImport: DataImportScreen,
 };
 
 const App = {

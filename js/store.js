@@ -130,7 +130,7 @@ function setSync(ok, text) {
   Store.syncText = text;
 }
 
-const SCREEN_ADMIN_ONLY = ['manageDc', 'manageZona', 'manageProduk', 'produkMaster'];
+const SCREEN_ADMIN_ONLY = ['manageDc', 'manageZona', 'manageProduk', 'produkMaster', 'dataExport', 'dataImport'];
 
 function goToScreen(name) {
   if (SCREEN_ADMIN_ONLY.includes(name) && Store.profile?.role !== 'admin') return;

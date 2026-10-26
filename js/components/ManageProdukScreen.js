@@ -1,5 +1,5 @@
 const ManageProdukScreen = {
-  components: { SearchableSelect },
+  components: { SearchableSelect, BulkActionBar },
   data() {
     return {
       store: Store,
@@ -17,9 +17,17 @@ const ManageProdukScreen = {
       assignSelected: null,
       assignSectorId: '',
       assignSaving: false,
+
+      sectorSelectMode: false,
+      selectedSectors: new Set(),
+      selectedPs: new Set(),
+      bulkBusy: false,
+      bulkBusyText: 'Mengecek...',
     };
   },
   watch: {
+    'store.sectorFilter'() { this.selectedPs.clear(); },
+    'store.searchQuery'() { this.selectedPs.clear(); },
     sectorModalOpen(v) { v ? lockScroll() : unlockScroll(); },
     assignModalOpen(v) { v ? lockScroll() : unlockScroll(); },
   },
@@ -36,6 +44,9 @@ const ManageProdukScreen = {
     filtered() {
       return this.produkZonaIni.filter(p => !this.store.searchQuery || p.nama.toLowerCase().includes(this.store.searchQuery));
     },
+    allPsSelected() { return this.filtered.length > 0 && this.filtered.every(p => this.selectedPs.has(p.id)); },
+    somePsSelected() { return !this.allPsSelected && this.filtered.some(p => this.selectedPs.has(p.id)); },
+    bulkCount() { return this.sectorSelectMode ? this.selectedSectors.size : this.selectedPs.size; },
     assignMatches() {
       const q = this.assignSearch.trim().toLowerCase();
       if (!q) return [];
@@ -48,6 +59,79 @@ const ManageProdukScreen = {
   },
   methods: {
     onSearchInput() { Store.searchQuery = this.searchInput.toLowerCase(); },
+
+    toggleSectorSelectMode() {
+      this.sectorSelectMode = !this.sectorSelectMode;
+      this.selectedSectors.clear();
+      this.selectedPs.clear();
+    },
+    toggleSector(s) { this.selectedSectors.has(s.id) ? this.selectedSectors.delete(s.id) : this.selectedSectors.add(s.id); },
+    selectAllSectors() {
+      if (this.selectedSectors.size === this.store.sectorsList.length) this.selectedSectors.clear();
+      else this.store.sectorsList.forEach(s => this.selectedSectors.add(s.id));
+    },
+    togglePs(p) { this.selectedPs.has(p.id) ? this.selectedPs.delete(p.id) : this.selectedPs.add(p.id); },
+    toggleAllPs() {
+      if (this.allPsSelected) this.filtered.forEach(p => this.selectedPs.delete(p.id));
+      else this.filtered.forEach(p => this.selectedPs.add(p.id));
+    },
+    clearBulk() {
+      this.selectedSectors.clear();
+      this.selectedPs.clear();
+    },
+    runBulk() { this.sectorSelectMode ? this.bulkDeleteSectors() : this.bulkRemovePs(); },
+    async bulkDeleteSectors() {
+      const ids = [...this.selectedSectors];
+      if (!ids.length || this.bulkBusy) return;
+      this.bulkBusy = true;
+      this.bulkBusyText = 'Mengecek...';
+      const check = await prepareBulkDeleteSectors(ids);
+      if (check.error) { this.bulkBusy = false; toast(check.error); return; }
+      const { deletable, skipped } = check;
+      const namaOf = id => this.store.sectorsList.find(s => s.id === id)?.nama || id;
+      if (!deletable.length) {
+        this.bulkBusy = false;
+        toast(`Semua sector yang dipilih sudah pernah dipakai di sesi opname, jadi nggak bisa dihapus.`, 'warn', 6000);
+        return;
+      }
+      const produkCount = this.store.produkList.filter(p => deletable.includes(p.sector_id)).length;
+      const skipNote = skipped.length ? `\n\nDilewati karena sudah dipakai di sesi opname: ${skipped.map(namaOf).join(', ')}.` : '';
+      const ok = await confirmDialog({
+        title: `Hapus ${deletable.length} sector?`,
+        message: `Sector ${deletable.map(namaOf).join(', ')} bakal dihapus${produkCount ? `, bersama ${produkCount} penempatan produk di dalamnya` : ''}. Data produk di Master Produk tetap aman.${skipNote}\n\nTindakan ini nggak bisa dibatalkan.`,
+        confirmText: `Hapus ${deletable.length}`, danger: true,
+      });
+      if (!ok) { this.bulkBusy = false; return; }
+      this.bulkBusyText = 'Menghapus...';
+      const { deleted, error } = await bulkDeleteSectors(deletable);
+      if (deletable.includes(Store.sectorFilter)) Store.sectorFilter = '';
+      await loadProdukForZona(Store.currentZonaId);
+      this.bulkBusy = false;
+      this.selectedSectors.clear();
+      if (error) { toast(`Berhenti setelah ${deleted} sector terhapus. ${error}`, 'error', 7000); return; }
+      if (deleted < deletable.length) { toast(`Cuma ${deleted} dari ${deletable.length} sector yang terhapus. Cek izin hapus (RLS) di tabel sectors.`, 'warn', 7000); return; }
+      if (!this.store.sectorsList.length) this.sectorSelectMode = false;
+      toast(`${deleted} sector dihapus${skipped.length ? `, ${skipped.length} dilewati` : ''}.`, 'success');
+    },
+    async bulkRemovePs() {
+      const ids = [...this.selectedPs];
+      if (!ids.length || this.bulkBusy) return;
+      const ok = await confirmDialog({
+        title: `Lepas ${ids.length} produk?`,
+        message: `${ids.length} produk bakal dilepas dari sector-nya. Data produk di Master Produk dan hasil opname yang sudah ada tetap aman.`,
+        confirmText: `Lepas ${ids.length}`, danger: true,
+      });
+      if (!ok) return;
+      this.bulkBusy = true;
+      this.bulkBusyText = 'Menghapus...';
+      const { deleted, error } = await bulkDeleteProdukSectors(ids);
+      await loadProdukForZona(Store.currentZonaId);
+      this.bulkBusy = false;
+      this.selectedPs.clear();
+      if (error) { toast(`Berhenti setelah ${deleted} produk dilepas. ${error}`, 'error', 7000); return; }
+      if (deleted < ids.length) { toast(`Cuma ${deleted} dari ${ids.length} produk yang dilepas. Cek izin hapus (RLS) di tabel produk_sectors.`, 'warn', 7000); return; }
+      toast(`${deleted} produk dilepas dari sector.`, 'success');
+    },
 
     openSectorCreate() {
       if (!Store.currentZonaId) { toast('Pilih zona dulu.', 'warn'); return; }
@@ -152,11 +236,29 @@ const ManageProdukScreen = {
           <button class="btn-ghost" @click="openSectorCreate"><i class="ti ti-plus"></i> Sector Baru</button>
           <button class="btn-ghost" @click="openAssignModal"><i class="ti ti-plus"></i> Produk Baru</button>
         </div>
-        <div class="sector-manage-list">
-          <div v-for="s in store.sectorsList" :key="s.id" class="sector-chip">
-            <span>{{ s.nama }}</span>
-            <button class="btn-icon-xs" title="Edit sector" @click="openSectorEdit(s)"><i class="ti ti-edit"></i></button>
-            <button class="btn-icon-xs danger" title="Hapus sector" @click="removeSector(s)"><i class="ti ti-trash"></i></button>
+        <div class="sector-manage-list" :class="{ selecting: sectorSelectMode }">
+          <div class="sector-manage-head">
+            <span class="sector-manage-title">Sector <b>{{ store.sectorsList.length }}</b></span>
+            <div v-if="store.sectorsList.length" class="sector-manage-tools">
+              <button v-if="sectorSelectMode" type="button" class="data-link" @click="selectAllSectors">{{ selectedSectors.size === store.sectorsList.length ? 'Kosongkan' : 'Pilih semua' }}</button>
+              <button type="button" class="sector-select-toggle" :class="{ active: sectorSelectMode }" @click="toggleSectorSelectMode">
+                <i class="ti" :class="sectorSelectMode ? 'ti-x' : 'ti-checkbox'"></i> {{ sectorSelectMode ? 'Selesai' : 'Pilih' }}
+              </button>
+            </div>
+          </div>
+          <div class="sector-chip-wrap">
+            <template v-for="s in store.sectorsList" :key="s.id">
+              <button v-if="sectorSelectMode" type="button" class="sector-chip sector-chip-select" :class="{ selected: selectedSectors.has(s.id) }" :aria-pressed="selectedSectors.has(s.id)" @click="toggleSector(s)">
+                <span class="data-check-box"><i class="ti ti-check"></i></span>
+                <span>{{ s.nama }}</span>
+              </button>
+              <div v-else class="sector-chip">
+                <span>{{ s.nama }}</span>
+                <button class="btn-icon-xs" title="Edit sector" @click="openSectorEdit(s)"><i class="ti ti-edit"></i></button>
+                <button class="btn-icon-xs danger" title="Hapus sector" @click="removeSector(s)"><i class="ti ti-trash"></i></button>
+              </div>
+            </template>
+            <span v-if="!store.sectorsList.length" class="data-muted" style="margin:0;">Belum ada sector di zona ini.</span>
           </div>
         </div>
 
@@ -164,11 +266,17 @@ const ManageProdukScreen = {
           <div class="table-scroll">
           <table class="produk-table">
             <colgroup>
-              <col style="width:13%"><col style="width:27%"><col style="width:18%">
-              <col style="width:12%"><col style="width:15%"><col style="width:15%">
+              <col style="width:48px"><col style="width:13%"><col style="width:27%"><col style="width:18%">
+              <col style="width:11%"><col style="width:15%"><col style="width:10%">
             </colgroup>
             <thead>
               <tr>
+                <th class="check-col">
+                  <label class="data-check data-check-plain" title="Pilih semua yang tampil">
+                    <input type="checkbox" :checked="allPsSelected" :indeterminate.prop="somePsSelected" :disabled="!filtered.length || sectorSelectMode" @change="toggleAllPs">
+                    <span class="data-check-box"><i class="ti ti-check"></i></span>
+                  </label>
+                </th>
                 <th>Kategori</th>
                 <th>Produk</th>
                 <th>Barcode</th>
@@ -178,8 +286,14 @@ const ManageProdukScreen = {
               </tr>
             </thead>
             <tbody>
-              <tr v-if="!filtered.length"><td colspan="6" class="empty-state">Gak ada produk yang cocok.</td></tr>
-              <tr v-for="p in filtered" :key="p.id">
+              <tr v-if="!filtered.length"><td colspan="7" class="empty-state">Gak ada produk yang cocok.</td></tr>
+              <tr v-for="p in filtered" :key="p.id" :class="{ 'row-selected': selectedPs.has(p.id) }">
+                <td class="check-col">
+                  <label class="data-check data-check-plain">
+                    <input type="checkbox" :checked="selectedPs.has(p.id)" :disabled="sectorSelectMode" @change="togglePs(p)">
+                    <span class="data-check-box"><i class="ti ti-check"></i></span>
+                  </label>
+                </td>
                 <td><span class="kategori-tag">{{ p.kategori || '-' }}</span></td>
                 <td class="produk-nama">{{ p.nama }}</td>
                 <td>{{ p.barcode }}</td>
@@ -195,6 +309,8 @@ const ManageProdukScreen = {
         </div>
         <div v-else class="empty-state"><p>Belum ada produk yang ke-assign ke sector di zona ini.</p></div>
       </div>
+
+      <BulkActionBar :count="bulkCount" :noun="sectorSelectMode ? 'sector' : 'produk'" :action-text="sectorSelectMode ? ('Hapus ' + bulkCount + ' sector') : ('Lepas ' + bulkCount + ' dari sector')" :busy="bulkBusy" :busy-text="bulkBusyText" @clear="clearBulk" @action="runBulk" />
 
     <Transition name="modal-pop">
       <div v-if="sectorModalOpen" class="modal-overlay" @click.self="closeSectorModal">
