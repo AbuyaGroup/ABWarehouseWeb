@@ -253,7 +253,7 @@ async function downloadImportTemplate() {
     ['Barcode', 'Opsional. Huruf depan barcode menentukan DC-nya (A = DC A, B = DC B, dst). Barcode baru yang tidak diawali huruf DC ditolak. Kalau diisi bareng Sector, produk otomatis ditempatkan di sector itu, dan huruf depannya harus sama dengan DC di baris itu.'],
     ['Nama Produk', 'Wajib untuk barcode baru.'],
     ['Kode Produk, Kategori, Sub Kategori, Satuan', 'Opsional.'],
-    ['Status', 'Opsional: Active atau Not Active. Kosong = Active untuk produk baru. Untuk produk yang sudah ada, status cuma diubah kalau opsi "Perbarui data yang sudah ada" dicentang. Produk Not Active tidak bisa ditempatkan ke sector baru.'],
+    ['Status', 'Opsional: Active atau Not Active. Kosong = Active untuk produk baru. Untuk produk yang sudah ada, status cuma diubah kalau opsi "Perbarui data yang sudah ada" dicentang. Baris dengan produk yang sudah Not Active dilewati: produknya tidak ditempatkan dan nama/detailnya tidak diubah.'],
     ['', ''],
     ['Cara kerja', 'Data yang sudah ada tidak dihapus. Baris dengan ID/barcode yang sudah ada dilewati, kecuali opsi "Perbarui data yang sudah ada" dicentang.'],
     ['Tips', 'File hasil Export (sheet "Struktur") bisa langsung diedit lalu di-import lagi.'],
@@ -402,6 +402,7 @@ async function buildImportPlan(rows, { updateExisting = false } = {}) {
   const validCodes = new Set(Object.values(codeByDcId).filter(Boolean));
   const ruleText = [...validCodes].sort().join(', ');
 
+  const skipped = [];
   const effectiveActive = {};
   defs.produk.forEach(d => {
     const ex = existing.produk[d.id];
@@ -415,6 +416,12 @@ async function buildImportPlan(rows, { updateExisting = false } = {}) {
       const exActive = ex.is_active !== false;
       effectiveActive[d.id] = exActive;
       if (updateExisting) {
+        if (!exActive && status !== true) {
+          if (diffFields(ex, d.v, ['nama', 'kode_produk', 'kategori', 'sub_kategori', 'satuan'])) {
+            skipped.push({ row: d.row, msg: `Produk "${d.id}" Not Active, nama/detailnya nggak diubah biar sesi opname lama tetap sama.` });
+          }
+          return;
+        }
         const patch = diffFields(ex, d.v, ['nama', 'kode_produk', 'kategori', 'sub_kategori', 'satuan']) || {};
         if (status !== null && status !== exActive) {
           patch.is_active = status;
@@ -443,7 +450,7 @@ async function buildImportPlan(rows, { updateExisting = false } = {}) {
     const key = `${row.barcode}|${row.sector_id}`;
     if (placed.has(key)) return;
     if (effectiveActive[row.barcode] === false) {
-      addError(row._row, `Produk "${row.barcode}" berstatus Not Active, nggak bisa ditempatkan di "${row.sector_id}".`);
+      skipped.push({ row: row._row, msg: `Produk "${row.barcode}" Not Active, nggak ditempatkan di "${row.sector_id}".` });
       return;
     }
     const dcCode = codeByDcId[row.dc_id];
@@ -462,7 +469,8 @@ async function buildImportPlan(rows, { updateExisting = false } = {}) {
     updates: plan.dcUpdates.size + plan.zoneUpdates.size + plan.sectorUpdates.size + plan.produkUpdates.size,
   };
   const totalChanges = Object.values(counts).reduce((a, b) => a + b, 0);
-  return { plan, counts, totalChanges, errors, rowCount: rows.length };
+  skipped.sort((a, b) => a.row - b.row);
+  return { plan, counts, totalChanges, errors, skipped, rowCount: rows.length };
 }
 
 async function executeImportPlan(plan, onProgress) {

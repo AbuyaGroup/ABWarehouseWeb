@@ -18,6 +18,8 @@ const DataImportScreen = {
     counts() { return this.result?.counts || {}; },
     errors() { return this.result?.errors || []; },
     shownErrors() { return this.errors.slice(0, 100); },
+    skipped() { return this.result?.skipped || []; },
+    shownSkipped() { return this.skipped.slice(0, 100); },
     canImport() { return this.stage === 'preview' && !this.errors.length && this.result?.totalChanges > 0; },
     progressPct() { return this.progress.total ? Math.round((this.progress.done / this.progress.total) * 100) : 0; },
     statCards() {
@@ -109,7 +111,7 @@ const DataImportScreen = {
       const c = this.counts;
       const ok = await confirmDialog({
         title: 'Import data?',
-        message: `Akan menambahkan ${c.dcs} DC, ${c.zones} zona, ${c.sectors} sector, ${c.produk} produk, dan ${c.placements} penempatan produk${c.updates ? `, serta memperbarui ${c.updates} data` : ''}. Lanjut?`,
+        message: `Akan menambahkan ${c.dcs} DC, ${c.zones} zona, ${c.sectors} sector, ${c.produk} produk, dan ${c.placements} penempatan produk${c.updates ? `, serta memperbarui ${c.updates} data` : ''}.${this.skipped.length ? `\n\n${this.skipped.length} baris produk Not Active dilewati.` : ''} Lanjut?`,
         confirmText: 'Import',
       });
       if (!ok) return;
@@ -197,7 +199,14 @@ const DataImportScreen = {
                     </ul>
                     <p v-if="errors.length > shownErrors.length" class="data-muted">+{{ errors.length - shownErrors.length }} masalah lain</p>
                   </div>
-                  <div v-else-if="stage === 'preview' && !result.totalChanges" class="data-alert info">
+                  <details v-if="skipped.length" class="data-alert warn data-skip-box">
+                    <summary class="data-error-title"><i class="ti ti-archive"></i> {{ skipped.length }} baris dilewati karena produknya Not Active. Data lain tetap bisa di-import.</summary>
+                    <ul>
+                      <li v-for="(e, i) in shownSkipped" :key="i"><b>Baris {{ e.row }}</b> {{ e.msg }}</li>
+                    </ul>
+                    <p v-if="skipped.length > shownSkipped.length" class="data-muted">+{{ skipped.length - shownSkipped.length }} baris lain</p>
+                  </details>
+                  <div v-if="!errors.length && stage === 'preview' && !result.totalChanges" class="data-alert info">
                     <i class="ti ti-info-circle"></i><span>Semua data di file ini sudah ada. Nggak ada yang perlu ditambahkan.</span>
                   </div>
 
@@ -244,6 +253,7 @@ const DataImportScreen = {
               <li><i class="ti ti-key"></i><span>DC, Zona, dan Sector dicocokkan lewat <b>ID</b>. Produk lewat <b>Barcode</b>.</span></li>
               <li><i class="ti ti-arrow-merge"></i><span>ID yang sudah ada dipakai ulang. Nama baru cuma diterapkan kalau opsi "Perbarui" dicentang.</span></li>
               <li><i class="ti ti-map-pin"></i><span>Barcode + Sector di baris yang sama = produk ditempatkan di sector itu.</span></li>
+              <li><i class="ti ti-archive"></i><span>Produk yang <b>Not Active</b> dibiarkan apa adanya: nggak ditempatkan dan nggak diubah, biar sesi opname lama tetap sama. Barisnya cuma dilewati.</span></li>
               <li><i class="ti ti-shield-check"></i><span>Kalau ada baris bermasalah, nggak ada yang disimpan sampai filenya dibetulkan.</span></li>
             </ul>
           </aside>

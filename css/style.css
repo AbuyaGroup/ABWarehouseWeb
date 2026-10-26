@@ -1588,3 +1588,13 @@
   @media (max-width:600px){
     .produk-dc-bar-right{ margin-left:0; justify-content:space-between; }
   }
+
+  .data-alert.warn{ background:var(--warn-soft); color:#8a5208; }
+  .data-skip-box{ display:block; }
+  .data-skip-box summary{ cursor:pointer; list-style:none; display:flex; align-items:center; gap:8px; font-weight:700; }
+  .data-skip-box summary::-webkit-details-marker{ display:none; }
+  .data-skip-box summary::after{ content:"Lihat"; margin-left:auto; font-size:12px; font-weight:600; text-decoration:underline; opacity:.8; }
+  .data-skip-box[open] summary::after{ content:"Tutup"; }
+  .data-skip-box ul{ margin:8px 0 0; padding:0; list-style:none; max-height:200px; overflow-y:auto; display:flex; flex-direction:column; gap:4px; }
+  .data-skip-box li b{ display:inline-block; min-width:62px; }
+  .data-skip-box .data-muted{ margin:4px 0 0; }
