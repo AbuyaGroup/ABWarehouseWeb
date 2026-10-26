@@ -19,23 +19,64 @@ const ProdukMasterScreen = {
       selected: new Set(),
       bulkBusy: false,
       bulkBusyText: 'Mengecek...',
+      activeTab: '',
+      statusFilter: 'active',
     };
   },
   watch: {
     modalOpen(v) { v ? lockScroll() : unlockScroll(); },
+    activeTab() {
+      Store.produkMasterPage = 1;
+      this.clearSelection();
+    },
+    statusFilter() {
+      Store.produkMasterPage = 1;
+      this.clearSelection();
+    },
+    noneCount(n) {
+      if (!n && this.activeTab === '__none') this.activeTab = this.dcTabs[0]?.id || '';
+    },
   },
   async mounted() {
     Store.produkMasterSearchQuery = '';
     Store.produkMasterPage = 1;
     this.searchInput = '';
     this.loading = true;
+    if (!Store.dcs.length) await loadDcs();
     await loadAndSetAllMasterProduk();
+    const preferred = this.dcTabs.find(t => t.id === Store.currentDc?.id) || this.dcTabs[0];
+    this.activeTab = preferred ? preferred.id : (this.noneCount ? '__none' : '');
     this.loading = false;
   },
   computed: {
+    dcTabs() {
+      return this.store.dcs.map(d => ({ id: d.id, nama: d.nama, code: dcCodeOf(d) })).filter(t => t.code)
+        .map(t => ({ ...t, count: this.store.allMasterProduk.filter(p => barcodeDcCode(p.barcode) === t.code).length }));
+    },
+    validCodes() { return this.dcTabs.map(t => t.code); },
+    noneCount() { return this.store.allMasterProduk.filter(p => !this.validCodes.includes(barcodeDcCode(p.barcode))).length; },
+    activeDcTab() { return this.dcTabs.find(t => t.id === this.activeTab) || null; },
+    dcItems() {
+      if (this.activeTab === '__none') return this.store.allMasterProduk.filter(p => !this.validCodes.includes(barcodeDcCode(p.barcode)));
+      const tab = this.activeDcTab;
+      if (!tab) return this.store.allMasterProduk;
+      return this.store.allMasterProduk.filter(p => barcodeDcCode(p.barcode) === tab.code);
+    },
+    activeCount() { return this.dcItems.filter(p => isProdukActive(p)).length; },
+    inactiveCount() { return this.dcItems.length - this.activeCount; },
+    tabItems() {
+      if (this.statusFilter === 'active') return this.dcItems.filter(p => isProdukActive(p));
+      if (this.statusFilter === 'inactive') return this.dcItems.filter(p => !isProdukActive(p));
+      return this.dcItems;
+    },
+    selectedProduk() { return this.store.allMasterProduk.filter(p => this.selected.has(p.barcode)); },
+    bulkActivate() { return this.selectedProduk.length > 0 && this.selectedProduk.every(p => !isProdukActive(p)); },
+    bulkTargets() { return this.selectedProduk.filter(p => isProdukActive(p) !== this.bulkActivate); },
+    formDc() { return dcForBarcode(this.formBarcode); },
+    barcodeRule() { return barcodeRuleText(); },
     filtered() {
       const q = Store.produkMasterSearchQuery;
-      return this.store.allMasterProduk.filter(p =>
+      return this.tabItems.filter(p =>
         !q ||
         p.nama?.toLowerCase().includes(q) ||
         p.barcode?.toLowerCase().includes(q) ||
@@ -68,39 +109,39 @@ const ProdukMasterScreen = {
     },
     selectAllFiltered() { this.filtered.forEach(p => this.selected.add(p.barcode)); },
     clearSelection() { this.selected.clear(); },
-    async bulkDelete() {
-      const barcodes = [...this.selected];
-      if (!barcodes.length || this.bulkBusy) return;
-      this.bulkBusy = true;
-      this.bulkBusyText = 'Mengecek...';
-      const check = await prepareBulkDeleteProduk(barcodes);
-      if (check.error) { this.bulkBusy = false; toast(check.error); return; }
-      const { deletable, skipped } = check;
-      if (!deletable.length) {
-        this.bulkBusy = false;
-        toast(`Semua ${skipped.length} produk yang dipilih sudah pernah dipakai di sesi opname, jadi nggak bisa dihapus.`, 'warn', 6000);
-        return;
-      }
-      const skipNote = skipped.length ? `\n\n${skipped.length} produk dilewati karena sudah pernah dipakai di sesi opname.` : '';
-      const ok = await confirmDialog({
-        title: `Hapus ${deletable.length} produk?`,
-        message: `${deletable.length} produk bakal dihapus dari Master Produk, termasuk penempatannya di semua sector.${skipNote}\n\nTindakan ini nggak bisa dibatalkan.`,
-        confirmText: `Hapus ${deletable.length}`, danger: true,
+    isActive(p) { return isProdukActive(p); },
+    async bulkToggle() {
+      if (!this.selected.size || this.bulkBusy) return;
+      const activate = this.bulkActivate;
+      const targets = this.bulkTargets.map(p => p.barcode);
+      const skipped = this.selected.size - targets.length;
+      if (!targets.length) { this.clearSelection(); return; }
+      const skipNote = skipped ? `\n\n${skipped} produk lain sudah Not Active, jadi dilewati.` : '';
+      const ok = await confirmDialog(activate ? {
+        title: `Aktifkan ${targets.length} produk?`,
+        message: `${targets.length} produk bakal kembali Active dan muncul lagi di daftar hitung sesi opname berikutnya.`,
+        confirmText: `Aktifkan ${targets.length}`,
+      } : {
+        title: `Nonaktifkan ${targets.length} produk?`,
+        message: `${targets.length} produk bakal jadi Not Active: nggak muncul lagi di daftar hitung sesi opname baru dan nggak bisa di-assign ke sector.\n\nData produk, penempatan di sector, dan hasil opname yang sudah ada tetap tersimpan. Bisa diaktifkan lagi kapan saja.${skipNote}`,
+        confirmText: `Nonaktifkan ${targets.length}`, danger: true,
       });
-      if (!ok) { this.bulkBusy = false; return; }
-      this.bulkBusyText = 'Menghapus...';
-      const { deleted, error } = await bulkDeleteMasterProduk(deletable);
+      if (!ok) return;
+      this.bulkBusy = true;
+      this.bulkBusyText = 'Menyimpan...';
+      const { updated, error } = await setProdukActive(targets, activate);
       this.bulkBusy = false;
       this.clearSelection();
-      if (error) { toast(`Berhenti setelah ${deleted} produk terhapus. ${error}`, 'error', 7000); return; }
-      if (deleted < deletable.length) { toast(`Cuma ${deleted} dari ${deletable.length} produk yang terhapus. Cek izin hapus (RLS) di tabel master_produk.`, 'warn', 7000); return; }
-      toast(`${deleted} produk dihapus${skipped.length ? `, ${skipped.length} dilewati` : ''}.`, 'success');
+      if (error) { toast(error, 'error', 8000); return; }
+      if (updated < targets.length) { toast(`Cuma ${updated} dari ${targets.length} produk yang berubah. Cek izin update (RLS) di tabel master_produk.`, 'warn', 7000); return; }
+      toast(`${updated} produk ${activate ? 'diaktifkan' : 'dinonaktifkan'}.`, 'success');
     },
     goToPage(n) { Store.produkMasterPage = n; },
 
+    setTab(id) { this.activeTab = id; },
     openCreate() {
       this.mode = 'create'; this.editingBarcode = null;
-      this.formBarcode = ''; this.formNama = ''; this.formKode = '';
+      this.formBarcode = this.activeDcTab ? this.activeDcTab.code : ''; this.formNama = ''; this.formKode = '';
       this.formKategori = ''; this.formSubKategori = ''; this.formSatuan = '';
       this.modalOpen = true;
     },
@@ -115,6 +156,7 @@ const ProdukMasterScreen = {
       const barcode = this.formBarcode.trim();
       const nama = this.formNama.trim();
       if (!barcode) { toast('Barcode wajib diisi.', 'warn'); return; }
+      if (this.mode === 'create' && !dcForBarcode(barcode)) { toast(`Barcode harus diawali huruf DC (${this.barcodeRule}).`, 'warn', 5000); return; }
       if (!nama) { toast('Nama produk wajib diisi.', 'warn'); return; }
 
       this.saving = true;
@@ -128,15 +170,19 @@ const ProdukMasterScreen = {
       if (error) { toast(error); return; }
       this.closeModal();
     },
-    async remove(p) {
-      const confirmed = await confirmDialog({
-        title: 'Hapus Produk?',
-        message: `Hapus produk "${p.nama}" dari Master Produk? Semua assignment-nya ke sector mana pun bakal ikut kehapus.\n\nKalau produk ini udah pernah dipake buat scan, penghapusan bakal ditolak otomatis biar data histori gak ilang.`,
-        confirmText: 'Hapus', danger: true,
-      });
-      if (!confirmed) return;
-      const { error } = await deleteProdukMaster(p.barcode);
-      if (error) toast(error);
+    async toggleStatus(p) {
+      const activate = !isProdukActive(p);
+      if (!activate) {
+        const ok = await confirmDialog({
+          title: 'Nonaktifkan produk?',
+          message: `"${p.nama}" bakal jadi Not Active: nggak muncul lagi di daftar hitung sesi opname baru dan nggak bisa di-assign ke sector.\n\nData produk, penempatan di sector, dan hasil opname yang sudah ada tetap tersimpan.`,
+          confirmText: 'Nonaktifkan', danger: true,
+        });
+        if (!ok) return;
+      }
+      const { error } = await setProdukActive([p.barcode], activate);
+      if (error) { toast(error, 'error', 8000); return; }
+      toast(`${p.nama} ${activate ? 'diaktifkan' : 'dinonaktifkan'}.`, 'success');
     },
   },
   template: `
@@ -145,7 +191,7 @@ const ProdukMasterScreen = {
         <div class="produk-toolbar">
           <div class="produk-toolbar-heading">
             <h1 style="font-size:19px;font-weight:600;margin:0 0 4px;">Master Produk</h1>
-            <p class="hint" style="margin:0;">Semua produk yang terdaftar, lepas dari DC/Zona/Sector manapun.</p>
+            <p class="hint" style="margin:0;">Produk dipisah per DC. Huruf depan barcode menentukan DC-nya.</p>
           </div>
           <div class="produk-toolbar-search">
             <div class="search-box">
@@ -154,16 +200,35 @@ const ProdukMasterScreen = {
             </div>
           </div>
         </div>
-        <div class="admin-actions">
-          <button class="btn-ghost" @click="openCreate"><i class="ti ti-plus"></i> Produk Baru</button>
+        <div class="admin-actions produk-dc-bar">
+          <div v-if="dcTabs.length || noneCount" class="dc-tabs" role="tablist">
+            <button v-for="t in dcTabs" :key="t.id" type="button" role="tab" :aria-selected="activeTab === t.id" :class="['dc-tab', { active: activeTab === t.id }]" @click="setTab(t.id)">
+              <span class="dc-tab-code">{{ t.code }}</span>{{ t.nama }}<span class="dc-tab-count">{{ t.count }}</span>
+            </button>
+            <button v-if="noneCount" type="button" role="tab" :aria-selected="activeTab === '__none'" :class="['dc-tab', 'warn', { active: activeTab === '__none' }]" @click="setTab('__none')">
+              <i class="ti ti-alert-triangle"></i>Tanpa DC<span class="dc-tab-count">{{ noneCount }}</span>
+            </button>
+          </div>
+          <div class="produk-dc-bar-right">
+            <div class="status-filter" role="group" aria-label="Filter status">
+              <button type="button" :class="{ active: statusFilter === 'active' }" @click="statusFilter = 'active'">Active <span>{{ activeCount }}</span></button>
+              <button type="button" :class="{ active: statusFilter === 'inactive' }" @click="statusFilter = 'inactive'">Not Active <span>{{ inactiveCount }}</span></button>
+              <button type="button" :class="{ active: statusFilter === 'all' }" @click="statusFilter = 'all'">Semua</button>
+            </div>
+            <button class="btn-ghost" @click="openCreate"><i class="ti ti-plus"></i> Produk Baru</button>
+          </div>
+        </div>
+        <div v-if="activeTab === '__none' && !loading" class="data-alert danger produk-none-note">
+          <i class="ti ti-alert-triangle"></i>
+          <span>Barcode produk di sini nggak diawali huruf DC ({{ barcodeRule }}), jadi nggak bisa di-assign ke DC mana pun. Hapus, atau bikin ulang dengan barcode yang benar.</span>
         </div>
 
-        <div v-if="!loading && store.allMasterProduk.length" class="produk-table-wrap">
+        <div v-if="!loading && tabItems.length" class="produk-table-wrap">
           <div class="table-scroll">
           <table class="produk-table">
             <colgroup>
-              <col style="width:48px"><col style="width:13%"><col style="width:27%"><col style="width:18%">
-              <col style="width:16%"><col style="width:11%"><col style="width:11%">
+              <col style="width:48px"><col style="width:12%"><col style="width:25%"><col style="width:16%">
+              <col style="width:13%"><col style="width:9%"><col style="width:12%"><col style="width:11%">
             </colgroup>
             <thead>
               <tr>
@@ -178,18 +243,19 @@ const ProdukMasterScreen = {
                 <th>Barcode</th>
                 <th>Kode Produk</th>
                 <th>Satuan</th>
+                <th>Status</th>
                 <th class="num">Aksi</th>
               </tr>
             </thead>
             <tbody>
               <tr v-if="showSelectAllHint" class="select-all-row">
-                <td colspan="7">
+                <td colspan="8">
                   <template v-if="!allFilteredSelected">Semua {{ pageItems.length }} produk di halaman ini dipilih. <button type="button" class="data-link" @click="selectAllFiltered">Pilih semua {{ filtered.length }} produk</button></template>
                   <template v-else>Semua {{ filtered.length }} produk dipilih. <button type="button" class="data-link" @click="clearSelection">Batal pilih</button></template>
                 </td>
               </tr>
-              <tr v-if="!filtered.length"><td colspan="7" class="empty-state">Gak ada produk yang cocok.</td></tr>
-              <tr v-for="p in pageItems" :key="p.barcode" :class="{ 'row-selected': isSelected(p) }">
+              <tr v-if="!filtered.length"><td colspan="8" class="empty-state">{{ statusFilter === 'inactive' ? 'Nggak ada produk Not Active.' : 'Gak ada produk yang cocok.' }}</td></tr>
+              <tr v-for="p in pageItems" :key="p.barcode" :class="{ 'row-selected': isSelected(p), 'row-inactive': !isActive(p) }">
                 <td class="check-col">
                   <label class="data-check data-check-plain">
                     <input type="checkbox" :checked="isSelected(p)" @change="toggleOne(p)">
@@ -201,9 +267,11 @@ const ProdukMasterScreen = {
                 <td>{{ p.barcode }}</td>
                 <td>{{ p.kode_produk || '-' }}</td>
                 <td>{{ p.satuan || '-' }}</td>
+                <td><span :class="['status-pill', isActive(p) ? 'on' : 'off']">{{ isActive(p) ? 'Active' : 'Not Active' }}</span></td>
                 <td class="num">
                   <button class="btn-icon" title="Edit" @click="openEdit(p)"><i class="ti ti-edit"></i></button>
-                  <button class="btn-icon danger" title="Hapus produk" @click="remove(p)"><i class="ti ti-trash"></i></button>
+                  <button v-if="isActive(p)" class="btn-icon danger" title="Nonaktifkan" @click="toggleStatus(p)"><i class="ti ti-archive"></i></button>
+                  <button v-else class="btn-icon" title="Aktifkan lagi" @click="toggleStatus(p)"><i class="ti ti-refresh"></i></button>
                 </td>
               </tr>
             </tbody>
@@ -216,17 +284,17 @@ const ProdukMasterScreen = {
           <table class="produk-table">
             <tbody>
               <tr v-for="n in 6" :key="n" class="skeleton-row">
-                <td class="check-col"></td><td><div class="skel-bar"></div></td><td><div class="skel-bar"></div></td><td><div class="skel-bar"></div></td>
+                <td class="check-col"></td><td><div class="skel-bar"></div></td><td><div class="skel-bar"></div></td><td><div class="skel-bar"></div></td><td><div class="skel-bar"></div></td>
                 <td><div class="skel-bar"></div></td><td><div class="skel-bar"></div></td><td><div class="skel-bar"></div></td>
               </tr>
             </tbody>
           </table>
           </div>
         </div>
-        <div v-else class="empty-state"><p>Belum ada produk yang terdaftar.</p></div>
+        <div v-else class="empty-state"><p>{{ activeDcTab ? 'Belum ada produk ' + activeDcTab.nama + '.' : 'Belum ada produk yang terdaftar.' }}</p></div>
       </div>
 
-      <BulkActionBar :count="selected.size" noun="produk" :action-text="'Hapus ' + selected.size" :busy="bulkBusy" :busy-text="bulkBusyText" @clear="clearSelection" @action="bulkDelete" />
+      <BulkActionBar :count="selected.size" noun="produk" :action-text="(bulkActivate ? 'Aktifkan ' : 'Nonaktifkan ') + bulkTargets.length" :icon="bulkActivate ? 'ti-refresh' : 'ti-archive'" :tone="bulkActivate ? 'primary' : 'danger'" :busy="bulkBusy" :busy-text="bulkBusyText" @clear="clearSelection" @action="bulkToggle" />
 
     <Transition name="modal-pop">
       <div v-if="modalOpen" class="modal-overlay" @click.self="closeModal">
@@ -235,6 +303,11 @@ const ProdukMasterScreen = {
           <div class="field">
             <label>Barcode</label>
             <input type="text" v-model="formBarcode" :disabled="mode === 'edit'" placeholder="cth: B290720260099">
+            <p v-if="mode === 'create'" :class="['barcode-dc-hint', { ok: formDc, bad: formBarcode.trim() && !formDc }]">
+              <template v-if="formDc"><i class="ti ti-circle-check"></i> Masuk ke {{ formDc.nama }}</template>
+              <template v-else-if="formBarcode.trim()"><i class="ti ti-alert-circle"></i> Huruf depan nggak cocok dengan DC mana pun ({{ barcodeRule }})</template>
+              <template v-else>Huruf depan menentukan DC: {{ barcodeRule }}</template>
+            </p>
           </div>
           <div class="field">
             <label>Nama Produk</label>

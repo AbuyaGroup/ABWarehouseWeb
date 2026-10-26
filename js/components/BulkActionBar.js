@@ -5,6 +5,8 @@ const BulkActionBar = {
     actionText: { type: String, default: 'Hapus' },
     busy: { type: Boolean, default: false },
     busyText: { type: String, default: 'Memproses...' },
+    icon: { type: String, default: 'ti-trash' },
+    tone: { type: String, default: 'danger' },
   },
   emits: ['clear', 'action'],
   template: `
@@ -15,8 +17,8 @@ const BulkActionBar = {
           <span>{{ noun }} dipilih</span>
         </div>
         <button type="button" class="bulk-bar-clear" :disabled="busy" @click="$emit('clear')">Batal pilih</button>
-        <button type="button" class="bulk-bar-action" :disabled="busy" @click="$emit('action')">
-          <i class="ti ti-trash"></i> {{ busy ? busyText : actionText }}
+        <button type="button" :class="['bulk-bar-action', 'tone-' + tone]" :disabled="busy" @click="$emit('action')">
+          <i class="ti" :class="icon"></i> {{ busy ? busyText : actionText }}
         </button>
       </div>
     </Transition>

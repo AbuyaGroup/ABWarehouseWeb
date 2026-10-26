@@ -47,15 +47,20 @@ const ManageProdukScreen = {
     allPsSelected() { return this.filtered.length > 0 && this.filtered.every(p => this.selectedPs.has(p.id)); },
     somePsSelected() { return !this.allPsSelected && this.filtered.some(p => this.selectedPs.has(p.id)); },
     bulkCount() { return this.sectorSelectMode ? this.selectedSectors.size : this.selectedPs.size; },
-    assignMatches() {
+    dcCode() { return dcCodeOf(this.store.currentDc); },
+    assignMatchesAll() {
       const q = this.assignSearch.trim().toLowerCase();
       if (!q) return [];
       return this.store.allMasterProduk.filter(p =>
         p.nama?.toLowerCase().includes(q) ||
         p.barcode?.toLowerCase().includes(q) ||
         p.kode_produk?.toLowerCase().includes(q)
-      ).slice(0, 20);
+      );
     },
+    assignMatchesDc() { return this.assignMatchesAll.filter(p => produkBelongsToDc(p.barcode, this.store.currentDc)); },
+    assignMatches() { return this.assignMatchesDc.filter(p => isProdukActive(p)).slice(0, 20); },
+    assignOtherDcCount() { return this.assignMatchesAll.length - this.assignMatchesDc.length; },
+    assignInactiveCount() { return this.assignMatchesDc.length - this.assignMatchesDc.filter(p => isProdukActive(p)).length; },
   },
   methods: {
     onSearchInput() { Store.searchQuery = this.searchInput.toLowerCase(); },
@@ -287,7 +292,7 @@ const ManageProdukScreen = {
             </thead>
             <tbody>
               <tr v-if="!filtered.length"><td colspan="7" class="empty-state">Gak ada produk yang cocok.</td></tr>
-              <tr v-for="p in filtered" :key="p.id" :class="{ 'row-selected': selectedPs.has(p.id) }">
+              <tr v-for="p in filtered" :key="p.id" :class="{ 'row-selected': selectedPs.has(p.id), 'row-inactive': p.is_active === false }">
                 <td class="check-col">
                   <label class="data-check data-check-plain">
                     <input type="checkbox" :checked="selectedPs.has(p.id)" :disabled="sectorSelectMode" @change="togglePs(p)">
@@ -295,7 +300,7 @@ const ManageProdukScreen = {
                   </label>
                 </td>
                 <td><span class="kategori-tag">{{ p.kategori || '-' }}</span></td>
-                <td class="produk-nama">{{ p.nama }}</td>
+                <td class="produk-nama">{{ p.nama }} <span v-if="p.is_active === false" class="status-pill off">Not Active</span></td>
                 <td>{{ p.barcode }}</td>
                 <td>{{ p.satuan || '-' }}</td>
                 <td><span class="sector-tag">{{ p.sector_nama }}</span></td>
@@ -337,12 +342,13 @@ const ManageProdukScreen = {
       <div v-if="assignModalOpen" class="modal-overlay" @click.self="closeAssignModal">
         <div class="modal-card">
           <h2>Assign Produk ke Sector</h2>
-          <p class="modal-desc" style="margin-bottom:16px;">Cari produk yang udah terdaftar di Master Produk, terus assign ke sector ini. Belum ada produknya? Bikin dulu lewat menu Master → Produk.</p>
+          <p class="modal-desc" style="margin-bottom:16px;">Cari produk {{ store.currentDc?.nama }} (barcode diawali <b>{{ dcCode }}</b>), terus assign ke sector ini. Belum ada produknya? Bikin dulu lewat menu Master → Produk.</p>
           <div class="field">
             <label>Cari Produk (nama / barcode / kode)</label>
             <input type="text" v-model="assignSearch" placeholder="Ketik buat cari...">
             <div :class="['assign-produk-results', { show: assignMatches.length || (assignSearch.trim() && !assignMatches.length) }]">
-              <div v-if="assignSearch.trim() && !assignMatches.length" class="assign-produk-result-item">Gak ketemu. Bikin dulu lewat Master → Produk.</div>
+              <div v-if="assignSearch.trim() && !assignMatches.length" class="assign-produk-result-item">Gak ketemu di {{ store.currentDc?.nama }}<template v-if="assignOtherDcCount"> ({{ assignOtherDcCount }} hasil ada di DC lain)</template>. Bikin dulu lewat Master → Produk.</div>
+              <div v-if="assignSearch.trim() && assignInactiveCount" class="assign-produk-result-item assign-produk-note">{{ assignInactiveCount }} produk yang cocok berstatus Not Active, aktifkan dulu di Master → Produk.</div>
               <div v-for="p in assignMatches" :key="p.barcode" class="assign-produk-result-item" @click="pickProduk(p)">
                 <b>{{ p.nama }}</b>
                 <span>{{ p.barcode }}{{ p.kode_produk ? ' · ' + p.kode_produk : '' }}</span>

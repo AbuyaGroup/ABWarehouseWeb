@@ -9,7 +9,7 @@ async function loadSectorsAndProduk(sectorIds) {
 
   const { data: psData, error: psErr } = await sb
     .from('produk_sectors')
-    .select('id, sector_id, barcode, master_produk(nama, kode_produk, kategori, sub_kategori, satuan)')
+    .select('id, sector_id, barcode, master_produk(*)')
     .in('sector_id', sectorIds);
   if (psErr) { console.error('Gagal muat produk_sectors:', psErr); Store.produkList = []; return; }
 
@@ -25,8 +25,15 @@ async function loadSectorsAndProduk(sectorIds) {
       satuan: ps.master_produk?.satuan || '',
       sector_id: ps.sector_id,
       sector_nama: sector ? sector.nama : '-',
+      is_active: ps.master_produk ? ps.master_produk.is_active !== false : true,
     };
   });
+}
+
+function hasCountedQty(e) { return !!e && e.qty_fisik !== null && e.qty_fisik !== undefined; }
+
+function produkCountableInSession(p, entries = Store.entries) {
+  return p.is_active !== false || hasCountedQty(entries[`${p.barcode}|${p.sector_id}`]);
 }
 
 async function loadProdukForZona(zonaId) {

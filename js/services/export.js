@@ -103,7 +103,7 @@ async function printSessionPdf(sessionId, sectorId) {
 
     const { data: psData, error: psErr } = await sb
       .from('produk_sectors')
-      .select('barcode, sector_id, master_produk(nama, satuan)')
+      .select('barcode, sector_id, master_produk(*)')
       .eq('sector_id', sectorId);
     if (psErr) throw psErr;
     if (!psData || !psData.length) { toast('Belum ada produk yang ke-assign ke sector ini (tabel produk_sectors).', 'warn'); return; }
@@ -117,6 +117,8 @@ async function printSessionPdf(sessionId, sectorId) {
 
     const entriesByKey = {};
     (entriesData || []).forEach(e => { entriesByKey[`${e.barcode}|${e.sector_id}`] = e; });
+    const visiblePs = psData.filter(ps => ps.master_produk?.is_active !== false || hasCountedQty(entriesByKey[`${ps.barcode}|${ps.sector_id}`]));
+    if (!visiblePs.length) { toast('Semua produk di sector ini berstatus Not Active.', 'warn'); return; }
 
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
@@ -125,7 +127,7 @@ async function printSessionPdf(sessionId, sectorId) {
     const header = ['Scanner', 'Sector', 'Sequence', 'Nama Produk', 'Unit', 'Counting 2', 'Counting 1'];
     const dcNama = Store.currentDc?.nama || '';
 
-    const rows = psData.map((ps, i) => {
+    const rows = visiblePs.map((ps, i) => {
       const e = entriesByKey[`${ps.barcode}|${sectorId}`];
       const scannerNama = getUpdatedByNama(e) || '-';
       const qty = (e && e.qty_fisik !== null && e.qty_fisik !== undefined) ? e.qty_fisik : '';

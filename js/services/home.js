@@ -53,12 +53,28 @@ async function loadHomeData(dcId, userId) {
     produkSectors = data;
   }
 
+  const inactive = new Set();
+  const { data: inactData, error: inactErr } = await sb.from('master_produk').select('barcode').eq('is_active', false);
+  if (!inactErr) (inactData || []).forEach(r => inactive.add(String(r.barcode)));
+
+  let latest = {};
+  if (active) {
+    const { data: entriesData, error: entErr } = await fetchAllRows(() => sb
+      .from('opname_entries')
+      .select('id, barcode, sector_id, qty_fisik, updated_by, updated_at')
+      .eq('session_id', active.id)
+      .order('updated_at', { ascending: true }));
+    if (entErr) return { error: 'Gagal muat data opname: ' + entErr.message };
+    entriesData.forEach(e => { latest[`${e.barcode}|${e.sector_id}`] = e; });
+  }
+
   const required = new Set();
   const zoneStats = {};
   zones.forEach(z => { zoneStats[z.id] = { total: 0, checked: 0 }; });
   produkSectors.forEach(ps => {
     const key = `${ps.barcode}|${ps.sector_id}`;
     if (required.has(key)) return;
+    if (inactive.has(String(ps.barcode)) && !hasCountedQty(latest[key])) return;
     required.add(key);
     const zid = sectorZone[ps.sector_id];
     if (zoneStats[zid]) zoneStats[zid].total++;
@@ -69,16 +85,6 @@ async function loadHomeData(dcId, userId) {
   let activity = [];
 
   if (active) {
-    const { data: entriesData, error: entErr } = await fetchAllRows(() => sb
-      .from('opname_entries')
-      .select('id, barcode, sector_id, qty_fisik, updated_by, updated_at')
-      .eq('session_id', active.id)
-      .order('updated_at', { ascending: true }));
-    if (entErr) return { error: 'Gagal muat data opname: ' + entErr.message };
-
-    const latest = {};
-    entriesData.forEach(e => { latest[`${e.barcode}|${e.sector_id}`] = e; });
-
     const today = new Date();
     Object.entries(latest).forEach(([key, e]) => {
       if (e.qty_fisik === null || e.qty_fisik === undefined) return;

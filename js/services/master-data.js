@@ -1,3 +1,37 @@
+function dcCodeOf(dc) {
+  if (!dc) return '';
+  const byId = String(dc.id || '').match(/^dc[-_ ]?([a-z])$/i);
+  if (byId) return byId[1].toUpperCase();
+  const byNama = String(dc.nama || '').trim().match(/(?:^|\s)([A-Za-z])$/);
+  return byNama ? byNama[1].toUpperCase() : '';
+}
+
+function barcodeDcCode(barcode) {
+  const first = String(barcode || '').trim().charAt(0).toUpperCase();
+  return /[A-Z]/.test(first) ? first : '';
+}
+
+function dcForBarcode(barcode, dcs = Store.dcs) {
+  const code = barcodeDcCode(barcode);
+  return code ? (dcs.find(d => dcCodeOf(d) === code) || null) : null;
+}
+
+function produkBelongsToDc(barcode, dc) {
+  const code = dcCodeOf(dc);
+  return !!code && barcodeDcCode(barcode) === code;
+}
+
+function isProdukActive(p) { return !p || p.is_active !== false; }
+
+function missingStatusColumn(error) {
+  return /is_active|deactivated_at/i.test(error?.message || '') && /column|schema/i.test(error?.message || '');
+}
+
+function barcodeRuleText(dcs = Store.dcs) {
+  const list = dcs.map(d => ({ code: dcCodeOf(d), nama: d.nama })).filter(x => x.code);
+  return list.map(x => `${x.code} = ${x.nama}`).join(', ');
+}
+
 async function saveDc({ isEdit, id, nama, sub, icon }) {
   const { error } = isEdit
     ? await sb.from('dcs').update({ nama, sub: sub || null, icon: icon || null }).eq('id', id)
@@ -52,6 +86,12 @@ async function ensureAllMasterProdukLoaded() {
 }
 
 async function assignProdukToSector(produk, sectorId) {
+  if (!isProdukActive(produk)) {
+    return { warn: `${produk.nama || produk.barcode} berstatus Not Active. Aktifkan dulu di Master → Produk.` };
+  }
+  if (Store.currentDc && !produkBelongsToDc(produk.barcode, Store.currentDc)) {
+    return { warn: `Barcode ${produk.barcode} bukan produk ${Store.currentDc.nama}. Produk ${Store.currentDc.nama} harus diawali huruf ${dcCodeOf(Store.currentDc)}.` };
+  }
   const { data: existingPs, error: psFindErr } = await sb
     .from('produk_sectors').select('id').eq('barcode', produk.barcode).eq('sector_id', sectorId).maybeSingle();
   if (psFindErr) throw psFindErr;
@@ -79,6 +119,9 @@ async function loadAndSetAllMasterProduk() {
 }
 
 async function saveMasterProduk({ isEdit, barcode, editingBarcode, nama, kode_produk, kategori, sub_kategori, satuan }) {
+  if (!isEdit && !dcForBarcode(barcode)) {
+    return { error: `Barcode harus diawali huruf DC (${barcodeRuleText()}).` };
+  }
   const payload = {
     nama,
     kode_produk: kode_produk || null,
@@ -94,11 +137,22 @@ async function saveMasterProduk({ isEdit, barcode, editingBarcode, nama, kode_pr
   return { error: null };
 }
 
-async function deleteProdukMaster(barcode) {
-  const { error } = await sb.from('master_produk').delete().eq('barcode', barcode);
-  if (error) return { error: 'Gagal hapus produk: ' + error.message };
+async function setProdukActive(barcodes, active) {
+  const patch = { is_active: active, deactivated_at: active ? null : new Date().toISOString() };
+  let updated = 0;
+  for (const part of chunk(barcodes, BULK_DELETE_CHUNK)) {
+    const { data, error } = await sb.from('master_produk').update(patch).in('barcode', part).select('barcode');
+    if (error) {
+      await loadAndSetAllMasterProduk();
+      const msg = missingStatusColumn(error)
+        ? 'Kolom status belum ada di database. Jalankan file sql/produk_status.sql di Supabase SQL Editor dulu.'
+        : error.message;
+      return { updated, error: msg };
+    }
+    updated += (data || []).length;
+  }
   await loadAndSetAllMasterProduk();
-  return { error: null };
+  return { updated, error: null };
 }
 
 const BULK_DELETE_CHUNK = 200;
@@ -123,18 +177,6 @@ async function bulkDeleteRows(table, field, values) {
     deleted += (data || []).length;
   }
   return { deleted, error: null };
-}
-
-async function prepareBulkDeleteProduk(barcodes) {
-  const { used, error } = await findUsedValues('barcode', barcodes);
-  if (error) return { error: 'Gagal cek riwayat opname: ' + error.message };
-  return { deletable: barcodes.filter(b => !used.has(String(b))), skipped: barcodes.filter(b => used.has(String(b))), error: null };
-}
-
-async function bulkDeleteMasterProduk(barcodes) {
-  const res = await bulkDeleteRows('master_produk', 'barcode', barcodes);
-  await loadAndSetAllMasterProduk();
-  return res;
 }
 
 async function prepareBulkDeleteSectors(sectorIds) {

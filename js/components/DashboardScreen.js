@@ -15,7 +15,8 @@ const DashboardScreen = {
       return [{ value: '', label: 'Semua Sector' }, ...this.store.sectorsList.map(s => ({ value: s.id, label: s.nama }))];
     },
     produkZonaIni() {
-      return this.store.sectorFilter ? this.store.produkList.filter(p => p.sector_id === this.store.sectorFilter) : this.store.produkList;
+      const list = this.store.produkList.filter(p => produkCountableInSession(p, this.store.entries));
+      return this.store.sectorFilter ? list.filter(p => p.sector_id === this.store.sectorFilter) : list;
     },
     filtered() {
       return this.produkZonaIni.filter(p => !this.store.searchQuery || p.nama.toLowerCase().includes(this.store.searchQuery));

@@ -15,7 +15,16 @@ const IMPORT_COLUMNS = [
   { key: 'kategori', label: 'Kategori', width: 14, aliases: ['kategori', 'category'] },
   { key: 'sub_kategori', label: 'Sub Kategori', width: 16, aliases: ['subkategori', 'subcategory'] },
   { key: 'satuan', label: 'Satuan', width: 10, aliases: ['satuan', 'unit'] },
+  { key: 'status', label: 'Status', width: 12, aliases: ['status', 'statusproduk'] },
 ];
+
+function parseStatusValue(v) {
+  const t = String(v || '').trim().toLowerCase().replace(/[\s_-]+/g, ' ');
+  if (!t) return null;
+  if (['not active', 'notactive', 'inactive', 'nonaktif', 'non aktif', 'tidak aktif', '0', 'false', 'no', 'n'].includes(t)) return false;
+  if (['active', 'aktif', '1', 'true', 'yes', 'y'].includes(t)) return true;
+  return undefined;
+}
 
 function normHeader(v) { return String(v || '').toLowerCase().replace(/[^a-z0-9]/g, ''); }
 
@@ -100,7 +109,7 @@ async function loadDcStructure(dcId) {
   }
   let produkSectors = [];
   if (sectors.length) {
-    const res = await fetchIn('produk_sectors', 'id, barcode, sector_id, sequence, master_produk(nama, kode_produk, kategori, sub_kategori, satuan)', 'sector_id', sectors.map(s => s.id), q => q.order('id'));
+    const res = await fetchIn('produk_sectors', 'id, barcode, sector_id, sequence, master_produk(*)', 'sector_id', sectors.map(s => s.id), q => q.order('id'));
     if (res.error) throw res.error;
     produkSectors = res.data;
   }
@@ -111,17 +120,18 @@ function buildStructureRows(dc, { zones, sectors, produkSectors }) {
   const byName = (a, b) => String(a.nama || '').localeCompare(String(b.nama || ''), 'id', { numeric: true });
   const rows = [];
   const dcCols = [dc.id, dc.nama, dc.sub || ''];
-  if (!zones.length) rows.push([...dcCols, '', '', '', '', '', '', '', '', '', '']);
+  const pad = r => { while (r.length < IMPORT_COLUMNS.length) r.push(''); return r; };
+  if (!zones.length) rows.push(pad([...dcCols]));
   [...zones].sort(byName).forEach(z => {
     const zSectors = sectors.filter(s => s.zone_id === z.id).sort(byName);
-    if (!zSectors.length) rows.push([...dcCols, z.id, z.nama, '', '', '', '', '', '', '', '']);
+    if (!zSectors.length) rows.push(pad([...dcCols, z.id, z.nama]));
     zSectors.forEach(s => {
       const items = produkSectors.filter(ps => ps.sector_id === s.id)
         .sort((a, b) => (a.sequence ?? 0) - (b.sequence ?? 0) || String(a.barcode).localeCompare(String(b.barcode)));
-      if (!items.length) rows.push([...dcCols, z.id, z.nama, s.id, s.nama, '', '', '', '', '', '']);
+      if (!items.length) rows.push(pad([...dcCols, z.id, z.nama, s.id, s.nama]));
       items.forEach(ps => {
         const p = ps.master_produk || {};
-        rows.push([...dcCols, z.id, z.nama, s.id, s.nama, ps.barcode, p.nama || '', p.kode_produk || '', p.kategori || '', p.sub_kategori || '', p.satuan || '']);
+        rows.push([...dcCols, z.id, z.nama, s.id, s.nama, ps.barcode, p.nama || '', p.kode_produk || '', p.kategori || '', p.sub_kategori || '', p.satuan || '', p.is_active === false ? 'Not Active' : 'Active']);
       });
     });
   });
@@ -225,11 +235,11 @@ async function exportDcData(dc, { includeSessions = true, sessionIds = null } = 
 async function downloadImportTemplate() {
   const workbook = new ExcelJS.Workbook();
   addTableSheet(workbook, 'Import', IMPORT_COLUMNS, [
-    ['dc-c', 'DC C', 'Surabaya', 'dc-c-z1', 'Zona 1', 'dc-c-z1-s1', 'S001', '8991234567890', 'Contoh Produk A', 'K001', 'FOOD', 'Snack', 'pcs'],
-    ['dc-c', 'DC C', 'Surabaya', 'dc-c-z1', 'Zona 1', 'dc-c-z1-s1', 'S001', '8991234567891', 'Contoh Produk B', 'K002', 'FOOD', 'Minuman', 'pack'],
+    ['dc-c', 'DC C', 'Surabaya', 'dc-c-z1', 'Zona 1', 'dc-c-z1-s1', 'S001', 'C8991234567890', 'Contoh Produk A', 'K001', 'FOOD', 'Snack', 'pcs', 'Active'],
+    ['dc-c', 'DC C', 'Surabaya', 'dc-c-z1', 'Zona 1', 'dc-c-z1-s1', 'S001', 'C8991234567891', 'Contoh Produk B', 'K002', 'FOOD', 'Minuman', 'pack', 'Active'],
     ['dc-c', 'DC C', 'Surabaya', 'dc-c-z1', 'Zona 1', 'dc-c-z1-s2', 'S002', '', '', '', '', '', ''],
     ['dc-c', 'DC C', 'Surabaya', 'dc-c-z2', 'Zona 2', '', '', '', '', '', '', '', ''],
-    ['', '', '', '', '', '', '', '8991234567892', 'Produk tanpa sector', '', 'NON FOOD', '', 'pcs'],
+    ['', '', '', '', '', '', '', 'A8991234567892', 'Produk DC A tanpa sector', '', 'NON FOOD', '', 'pcs', 'Not Active'],
   ]);
   const guide = workbook.addWorksheet('Petunjuk');
   guide.columns = [{ width: 22 }, { width: 90 }];
@@ -240,9 +250,10 @@ async function downloadImportTemplate() {
     ['DC Sub-judul', 'Opsional, cth: lokasi DC.'],
     ['Zona ID / Zona Nama', 'Opsional. Zona ID harus unik di seluruh sistem. Zona Nama wajib untuk zona baru.'],
     ['Sector ID / Sector Nama', 'Opsional, butuh Zona. Sector ID harus unik. Sector Nama wajib untuk sector baru.'],
-    ['Barcode', 'Opsional. Kalau diisi bareng Sector, produk otomatis ditempatkan di sector itu.'],
+    ['Barcode', 'Opsional. Huruf depan barcode menentukan DC-nya (A = DC A, B = DC B, dst). Barcode baru yang tidak diawali huruf DC ditolak. Kalau diisi bareng Sector, produk otomatis ditempatkan di sector itu, dan huruf depannya harus sama dengan DC di baris itu.'],
     ['Nama Produk', 'Wajib untuk barcode baru.'],
     ['Kode Produk, Kategori, Sub Kategori, Satuan', 'Opsional.'],
+    ['Status', 'Opsional: Active atau Not Active. Kosong = Active untuk produk baru. Untuk produk yang sudah ada, status cuma diubah kalau opsi "Perbarui data yang sudah ada" dicentang. Produk Not Active tidak bisa ditempatkan ke sector baru.'],
     ['', ''],
     ['Cara kerja', 'Data yang sudah ada tidak dihapus. Baris dengan ID/barcode yang sudah ada dilewati, kecuali opsi "Perbarui data yang sudah ada" dicentang.'],
     ['Tips', 'File hasil Export (sheet "Struktur") bisa langsung diedit lalu di-import lagi.'],
@@ -290,7 +301,7 @@ async function loadExistingForImport(rows) {
     dcIds.length ? fetchIn('dcs', 'id, nama, sub', 'id', dcIds) : { data: [] },
     zoneIds.length ? fetchIn('zones', 'id, nama, dc_id', 'id', zoneIds) : { data: [] },
     sectorIds.length ? fetchIn('sectors', 'id, nama, zone_id', 'id', sectorIds) : { data: [] },
-    barcodes.length ? fetchIn('master_produk', 'barcode, nama, kode_produk, kategori, sub_kategori, satuan', 'barcode', barcodes) : { data: [] },
+    barcodes.length ? fetchIn('master_produk', '*', 'barcode', barcodes) : { data: [] },
     sectorIds.length ? fetchIn('produk_sectors', 'id, barcode, sector_id, sequence', 'sector_id', sectorIds) : { data: [] },
     sb.from('dcs').select('urutan'),
   ]);
@@ -341,8 +352,8 @@ async function buildImportPlan(rows, { updateExisting = false } = {}) {
     if (zona_id) merge('zone', zona_id, row._row, { dc_id, nama: row.zona_nama }, { dc_id: 'DC', nama: 'Zona Nama' });
     if (sector_id) merge('sector', sector_id, row._row, { zone_id: zona_id, nama: row.sector_nama }, { zone_id: 'Zona', nama: 'Sector Nama' });
     if (barcode) merge('produk', barcode, row._row,
-      { nama: row.produk_nama, kode_produk: row.kode_produk, kategori: row.kategori, sub_kategori: row.sub_kategori, satuan: row.satuan },
-      { nama: 'Nama Produk', kode_produk: 'Kode Produk', kategori: 'Kategori', sub_kategori: 'Sub Kategori', satuan: 'Satuan' });
+      { nama: row.produk_nama, kode_produk: row.kode_produk, kategori: row.kategori, sub_kategori: row.sub_kategori, satuan: row.satuan, status: row.status },
+      { nama: 'Nama Produk', kode_produk: 'Kode Produk', kategori: 'Kategori', sub_kategori: 'Sub Kategori', satuan: 'Satuan', status: 'Status' });
   });
 
   const plan = {
@@ -384,20 +395,44 @@ async function buildImportPlan(rows, { updateExisting = false } = {}) {
     else plan.sectors.set(d.id, { id: d.id, nama: d.v.nama, zone_id: d.v.zone_id });
   });
 
+  const codeByDcId = {};
+  Store.dcs.forEach(dc => { codeByDcId[dc.id] = dcCodeOf(dc); });
+  Object.values(existing.dcs).forEach(dc => { codeByDcId[dc.id] = dcCodeOf(dc); });
+  defs.dc.forEach(d => { if (!codeByDcId[d.id]) codeByDcId[d.id] = dcCodeOf({ id: d.id, nama: d.v.nama }); });
+  const validCodes = new Set(Object.values(codeByDcId).filter(Boolean));
+  const ruleText = [...validCodes].sort().join(', ');
+
+  const effectiveActive = {};
   defs.produk.forEach(d => {
     const ex = existing.produk[d.id];
+    const status = parseStatusValue(d.v.status);
+    if (status === undefined) { addError(d.row, `Status "${d.v.status}" untuk "${d.id}" nggak dikenal. Pakai Active atau Not Active.`); return; }
+    if (!ex && !validCodes.has(barcodeDcCode(d.id))) {
+      addError(d.row, `Barcode "${d.id}" harus diawali huruf DC (${ruleText || 'belum ada DC'}).`);
+      return;
+    }
     if (ex) {
+      const exActive = ex.is_active !== false;
+      effectiveActive[d.id] = exActive;
       if (updateExisting) {
-        const patch = diffFields(ex, d.v, ['nama', 'kode_produk', 'kategori', 'sub_kategori', 'satuan']);
-        if (patch) plan.produkUpdates.set(d.id, patch);
+        const patch = diffFields(ex, d.v, ['nama', 'kode_produk', 'kategori', 'sub_kategori', 'satuan']) || {};
+        if (status !== null && status !== exActive) {
+          patch.is_active = status;
+          patch.deactivated_at = status ? null : new Date().toISOString();
+          effectiveActive[d.id] = status;
+        }
+        if (Object.keys(patch).length) plan.produkUpdates.set(d.id, patch);
       }
       return;
     }
     if (!d.v.nama) { addError(d.row, `Barcode "${d.id}" belum ada, Nama Produk wajib diisi.`); return; }
-    plan.produk.set(d.id, {
+    const rowData = {
       barcode: d.id, nama: d.v.nama, kode_produk: d.v.kode_produk || null, kategori: d.v.kategori || null,
       sub_kategori: d.v.sub_kategori || null, satuan: d.v.satuan || null,
-    });
+    };
+    if (status === false) { rowData.is_active = false; rowData.deactivated_at = new Date().toISOString(); }
+    effectiveActive[d.id] = status !== false;
+    plan.produk.set(d.id, rowData);
   });
 
   const nextSeq = {};
@@ -407,6 +442,15 @@ async function buildImportPlan(rows, { updateExisting = false } = {}) {
     if (!row.barcode || !row.sector_id || !row.zona_id || !row.dc_id) return;
     const key = `${row.barcode}|${row.sector_id}`;
     if (placed.has(key)) return;
+    if (effectiveActive[row.barcode] === false) {
+      addError(row._row, `Produk "${row.barcode}" berstatus Not Active, nggak bisa ditempatkan di "${row.sector_id}".`);
+      return;
+    }
+    const dcCode = codeByDcId[row.dc_id];
+    if (dcCode && barcodeDcCode(row.barcode) !== dcCode) {
+      addError(row._row, `Barcode "${row.barcode}" bukan produk DC ${dcCode}, nggak bisa ditempatkan di "${row.sector_id}". Produk DC ${dcCode} harus diawali huruf ${dcCode}.`);
+      return;
+    }
     placed.add(key);
     nextSeq[row.sector_id] = (nextSeq[row.sector_id] || 0) + 1;
     plan.placements.set(key, { barcode: row.barcode, sector_id: row.sector_id, sequence: nextSeq[row.sector_id] });
