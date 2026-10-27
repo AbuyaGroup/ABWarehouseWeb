@@ -4,6 +4,8 @@ const DataExportScreen = {
     return {
       store: Store,
       dcId: '',
+      includeStructure: true,
+      includeProduk: true,
       includeSessions: true,
       sessions: [],
       selectedSessionIds: [],
@@ -16,9 +18,13 @@ const DataExportScreen = {
     dcOptions() { return this.store.dcs.map(d => ({ value: d.id, label: d.sub ? `${d.nama} · ${d.sub}` : d.nama })); },
     dc() { return this.store.dcs.find(d => d.id === this.dcId) || null; },
     allSelected() { return this.sessions.length > 0 && this.selectedSessionIds.length === this.sessions.length; },
-    canExport() { return !!this.dc && !this.exporting && (!this.includeSessions || !this.sessions.length || this.selectedSessionIds.length > 0); },
+    nothingChosen() { return !this.includeStructure && !this.includeProduk && !this.includeSessions; },
+    canExport() { return !!this.dc && !this.exporting && !this.nothingChosen && (!this.includeSessions || !this.sessions.length || this.selectedSessionIds.length > 0); },
+    exportLabel() { return this.includeProduk && !this.includeStructure && !this.includeSessions ? 'Export Produk' : 'Export Excel'; },
     sheetList() {
-      const list = [{ icon: 'ti-sitemap', name: 'Struktur', desc: 'DC, Zona, Sector, dan produk di tiap sector. Format sama dengan template import.' }];
+      const list = [];
+      if (this.includeProduk) list.push({ icon: 'ti-package', name: 'Produk', desc: 'Daftar produk DC ini (Active & Not Active), lengkap dengan status dan sector tempat produk ditaruh. Bisa di-import balik buat update data produk.' });
+      if (this.includeStructure) list.push({ icon: 'ti-sitemap', name: 'Struktur', desc: 'DC, Zona, Sector, dan produk di tiap sector. Format sama dengan template import.' });
       if (this.includeSessions) {
         list.push(
           { icon: 'ti-calendar-event', name: 'Sesi', desc: 'Daftar sesi opname yang dipilih.' },
@@ -57,10 +63,18 @@ const DataExportScreen = {
       if (!this.canExport) return;
       this.exporting = true;
       try {
-        this.lastSummary = await exportDcData(this.dc, {
+        const opts = { includeStructure: this.includeStructure, includeProduk: this.includeProduk, includeSessions: this.includeSessions };
+        const sum = await exportDcData(this.dc, {
+          includeStructure: this.includeStructure,
+          includeProduk: this.includeProduk,
           includeSessions: this.includeSessions,
           sessionIds: this.includeSessions ? [...this.selectedSessionIds] : null,
         });
+        const parts = [];
+        if (opts.includeProduk) parts.push(`${sum.produk} produk (${sum.produkAktif} Active, ${sum.produkNonaktif} Not Active)`);
+        if (opts.includeStructure) parts.push(`${sum.zona} zona, ${sum.sector} sector, ${sum.penempatan} penempatan`);
+        if (opts.includeSessions) parts.push(`${sum.sesi} sesi, ${sum.entri} baris hasil opname`);
+        this.lastSummary = { ...sum, parts };
         toast(`Export ${this.dc.nama} selesai.`, 'success');
       } catch (err) {
         console.error('Gagal export data DC:', err);
@@ -95,9 +109,14 @@ const DataExportScreen = {
               <div class="data-step-body">
                 <h3>Isi file</h3>
                 <label class="data-check">
-                  <input type="checkbox" checked disabled>
+                  <input type="checkbox" v-model="includeProduk">
                   <span class="data-check-box"><i class="ti ti-check"></i></span>
-                  <span>Struktur DC & produk</span>
+                  <span>Produk</span>
+                </label>
+                <label class="data-check">
+                  <input type="checkbox" v-model="includeStructure">
+                  <span class="data-check-box"><i class="ti ti-check"></i></span>
+                  <span>Struktur (Zona, Sector & penempatan produk)</span>
                 </label>
                 <label class="data-check">
                   <input type="checkbox" v-model="includeSessions">
@@ -127,13 +146,14 @@ const DataExportScreen = {
 
             <div class="data-actions">
               <button class="btn-amber data-btn" :disabled="!canExport" @click="runExport">
-                <i class="ti ti-file-spreadsheet"></i> {{ exporting ? 'Menyiapkan file...' : 'Export Excel' }}
+                <i class="ti ti-file-spreadsheet"></i> {{ exporting ? 'Menyiapkan file...' : exportLabel }}
               </button>
             </div>
+            <p v-if="nothingChosen" class="data-muted data-actions-note">Centang minimal satu isi file.</p>
 
             <div v-if="lastSummary" class="data-result">
               <i class="ti ti-circle-check"></i>
-              <span>Terunduh: {{ lastSummary.zona }} zona, {{ lastSummary.sector }} sector, {{ lastSummary.produk }} produk ({{ lastSummary.penempatan }} penempatan)<template v-if="includeSessions">, {{ lastSummary.sesi }} sesi, {{ lastSummary.entri }} baris hasil opname</template>.</span>
+              <span>Terunduh: {{ lastSummary.parts.join(', ') }}.</span>
             </div>
           </section>
 

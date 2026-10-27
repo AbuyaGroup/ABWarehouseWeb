@@ -1598,3 +1598,8 @@
   .data-skip-box ul{ margin:8px 0 0; padding:0; list-style:none; max-height:200px; overflow-y:auto; display:flex; flex-direction:column; gap:4px; }
   .data-skip-box li b{ display:inline-block; min-width:62px; }
   .data-skip-box .data-muted{ margin:4px 0 0; }
+
+  .data-actions-note{ margin:8px 0 0; padding-left:44px; color:var(--warn); }
+  @media (max-width:600px){
+    .data-actions-note{ padding-left:0; }
+  }

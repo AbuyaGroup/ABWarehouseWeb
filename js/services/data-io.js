@@ -138,7 +138,45 @@ function buildStructureRows(dc, { zones, sectors, produkSectors }) {
   return rows;
 }
 
-async function exportDcData(dc, { includeSessions = true, sessionIds = null } = {}) {
+const PRODUK_EXPORT_COLUMNS = [
+  { label: 'Barcode', width: 18 }, { label: 'Nama Produk', width: 32 }, { label: 'Kode Produk', width: 14 },
+  { label: 'Kategori', width: 14 }, { label: 'Sub Kategori', width: 16 }, { label: 'Satuan', width: 10 },
+  { label: 'Status', width: 12 }, { label: 'Jumlah Penempatan', width: 18 }, { label: 'Ditempatkan Di', width: 40 },
+];
+
+async function loadDcProduk(dc, structure) {
+  const code = dcCodeOf(dc);
+  const byBarcode = {};
+  if (code) {
+    const { data, error } = await fetchAllRows(() => sb.from('master_produk').select('*').ilike('barcode', `${code}%`).order('barcode'));
+    if (error) throw error;
+    data.forEach(p => { byBarcode[String(p.barcode)] = p; });
+  }
+  structure.produkSectors.forEach(ps => {
+    if (!byBarcode[ps.barcode] && ps.master_produk) byBarcode[ps.barcode] = { barcode: ps.barcode, ...ps.master_produk };
+  });
+  return Object.values(byBarcode);
+}
+
+function buildProdukRows(produk, structure) {
+  const sectorById = Object.fromEntries(structure.sectors.map(s => [s.id, s]));
+  const zoneById = Object.fromEntries(structure.zones.map(z => [z.id, z]));
+  const placesByBarcode = {};
+  structure.produkSectors.forEach(ps => {
+    const sec = sectorById[ps.sector_id];
+    const zona = sec ? zoneById[sec.zone_id] : null;
+    (placesByBarcode[ps.barcode] = placesByBarcode[ps.barcode] || []).push(`${zona?.nama || '-'} / ${sec?.nama || ps.sector_id}`);
+  });
+  return [...produk]
+    .sort((a, b) => String(a.nama || '').localeCompare(String(b.nama || ''), 'id', { numeric: true }) || String(a.barcode).localeCompare(String(b.barcode)))
+    .map(p => {
+      const places = (placesByBarcode[p.barcode] || []).sort((a, b) => a.localeCompare(b, 'id', { numeric: true }));
+      return [p.barcode, p.nama || '', p.kode_produk || '', p.kategori || '', p.sub_kategori || '', p.satuan || '',
+        p.is_active === false ? 'Not Active' : 'Active', places.length, places.join(', ')];
+    });
+}
+
+async function exportDcData(dc, { includeStructure = true, includeProduk = true, includeSessions = true, sessionIds = null } = {}) {
   const structure = await loadDcStructure(dc.id);
   const zoneById = Object.fromEntries(structure.zones.map(z => [z.id, z]));
   const sectorById = Object.fromEntries(structure.sectors.map(s => [s.id, s]));
@@ -147,17 +185,28 @@ async function exportDcData(dc, { includeSessions = true, sessionIds = null } = 
   workbook.creator = 'Abuya Inventory';
   workbook.created = new Date();
 
-  const structureRows = buildStructureRows(dc, structure);
-  addTableSheet(workbook, 'Struktur', IMPORT_COLUMNS, structureRows);
-
   const summary = {
     zona: structure.zones.length,
     sector: structure.sectors.length,
     produk: new Set(structure.produkSectors.map(p => p.barcode)).size,
     penempatan: structure.produkSectors.length,
+    produkAktif: 0,
+    produkNonaktif: 0,
     sesi: 0,
     entri: 0,
   };
+
+  if (includeProduk) {
+    const produk = await loadDcProduk(dc, structure);
+    summary.produk = produk.length;
+    summary.produkAktif = produk.filter(p => p.is_active !== false).length;
+    summary.produkNonaktif = produk.length - summary.produkAktif;
+    addTableSheet(workbook, 'Produk', PRODUK_EXPORT_COLUMNS, buildProdukRows(produk, structure));
+  }
+
+  if (includeStructure) {
+    addTableSheet(workbook, 'Struktur', IMPORT_COLUMNS, buildStructureRows(dc, structure));
+  }
 
   if (includeSessions) {
     const { data: sessionsData, error: sErr } = await sb.from('opname_sessions').select('*').eq('dc_id', dc.id).order('tanggal', { ascending: false });
@@ -228,7 +277,8 @@ async function exportDcData(dc, { includeSessions = true, sessionIds = null } = 
   }
 
   const stamp = new Date().toISOString().slice(0, 10);
-  await downloadWorkbook(workbook, `${safeFileName(dc.nama)}_Data_${stamp}.xlsx`);
+  const kind = includeProduk && !includeStructure && !includeSessions ? 'Produk' : 'Data';
+  await downloadWorkbook(workbook, `${safeFileName(dc.nama)}_${kind}_${stamp}.xlsx`);
   return summary;
 }
 
@@ -264,7 +314,7 @@ async function downloadImportTemplate() {
 async function parseImportFile(file) {
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(await file.arrayBuffer());
-  const sheet = workbook.getWorksheet('Import') || workbook.getWorksheet('Struktur') || workbook.worksheets[0];
+  const sheet = workbook.getWorksheet('Import') || workbook.getWorksheet('Struktur') || workbook.getWorksheet('Produk') || workbook.worksheets[0];
   if (!sheet) throw new Error('File kosong, nggak ada sheet yang bisa dibaca.');
 
   let headerRowNo = 0;

@@ -28,8 +28,8 @@ const LoginScreen = {
         <div class="login-visual-shape shape-2"></div>
         <div class="login-visual-content">
           <div class="login-visual-brand"><div class="mark"><i class="ti ti-building-warehouse"></i></div><span>ABWarehouse</span></div>
-          <h1 class="login-visual-headline">Tanggal 29 SO? Pakai ini aja dulu mas bro!</h1>
-          <p class="login-visual-sub">Yang menghitung, merekap, dan menginventarisasi</p>
+          <h1 class="login-visual-headline">Yaudah</h1>
+          <p class="login-visual-sub">Masih dikerjain</p>
           <ul class="login-visual-points">
             <li><i class="ti ti-bolt"></i> Sinkron real-time antar device</li>
             <li><i class="ti ti-clipboard-check"></i> Review & konfirmasi qty final</li>
