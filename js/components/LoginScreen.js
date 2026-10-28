@@ -28,8 +28,8 @@ const LoginScreen = {
         <div class="login-visual-shape shape-2"></div>
         <div class="login-visual-content">
           <div class="login-visual-brand"><div class="mark"><i class="ti ti-building-warehouse"></i></div><span>ABWarehouse</span></div>
-          <h1 class="login-visual-headline">Yaudah</h1>
-          <p class="login-visual-sub">Masih dikerjain</p>
+          <h1 class="login-visual-headline">Stock Opname</h1>
+          <p class="login-visual-sub">Rekap bulanan stock akhir.</p>
           <ul class="login-visual-points">
             <li><i class="ti ti-bolt"></i> Sinkron real-time antar device</li>
             <li><i class="ti ti-clipboard-check"></i> Review & konfirmasi qty final</li>
@@ -40,7 +40,7 @@ const LoginScreen = {
       <div class="login-form-panel">
         <div class="login-card">
           <div class="login-brand"><div class="mark"><i class="ti ti-building-warehouse"></i></div><span>Masuk</span></div>
-          <p class="sub">Inventory</p>
+          <p class="sub">Gudang Abuya Group</p>
           <div :class="['login-error', { show: errorMsg }]">{{ errorMsg }}</div>
           <div class="field">
             <label>Username</label>
